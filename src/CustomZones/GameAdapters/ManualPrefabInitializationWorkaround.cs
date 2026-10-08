@@ -142,33 +142,107 @@ namespace CS2StyleMod.CustomZones.GameAdapters
         // IZoneBuildingComponent cascade, etc.), then sets
         // BuildingSpawnGroupData manually - the one thing BuildingInitializeSystem
         // sets that isn't a ComponentBase method - and copies
-        // ObjectGeometryData/BuildingData straight from the template.
-        // Those two are a THIRD category, different from both the
+        // ObjectGeometryData/BuildingData, plus every DynamicBuffer<T> the
+        // template has (SubMesh - the renderable mesh reference(s); SubObject
+        // - the prefab-side list of decorative sub-objects read by
+        // Game.Objects.SubObjectSystem at per-instance spawn time; and
+        // whatever else turns up - found two so far by trial and error,
+        // stopped guessing and now copy every buffer the archetype
+        // declares, see CopyAllBuffers), straight from the template.
+        // Those are a THIRD category, different from both the
         // ComponentBase-method case above and the bespoke-system-logic
         // case (ZoneType/m_ZonePrefabs): ObjectGeometryPrefab has no
         // Initialize/LateInitialize override at all - its values get
         // computed by yet another independent Created-tag-keyed system
         // (Game.Prefabs.ObjectInitializeSystem) that, like every other
         // such system found so far, never fires for a runtime-added
-        // entity. Since the clone's geometry/footprint should be
-        // identical to the template's anyway (same mesh, same lot size -
-        // we're not changing what the building looks like, only what
-        // zone it belongs to), copying directly is both correct and
-        // simpler than re-deriving it from the mesh ourselves.
+        // entity. Since the clone's geometry/footprint/mesh/sub-objects
+        // should be identical to the template's anyway (same mesh, same
+        // lot size - we're not changing what the building looks like,
+        // only what zone it belongs to), copying directly is both correct
+        // and simpler than re-deriving any of it ourselves.
         public void InitializeClonedBuilding(BuildingPrefab clonedBuildingPrefab, Entity templateBuildingEntity, Entity clonedBuildingEntity, ZoneType clonedZoneType)
         {
-            RunComponentLifecycle(clonedBuildingPrefab, clonedBuildingEntity);
-
-            m_EntityManager.SetSharedComponent(clonedBuildingEntity, new BuildingSpawnGroupData(clonedZoneType));
-
+            // All template-derived baseline data goes in BEFORE
+            // RunComponentLifecycle, not after - geometry/lot size and the
+            // buffers included. Observed bug this fixes: lot-boundary
+            // fences (regular SubObject entries, EdgePlacement-flagged -
+            // Game.Objects.SubObjectSystem.CreateSubObjects computes where
+            // they go from the owner's actual ObjectGeometryData/lot size)
+            // coming out partial/stopping halfway when geometry/lot size
+            // were still zeroed at the time anything in RunComponentLifecycle
+            // read them, only getting corrected afterward. Order now
+            // matches intent: establish the full template baseline first,
+            // then let real Initialize/LateInitialize (and the manual
+            // BuildingSpawnGroupData assignment) override whatever's
+            // actually meant to differ per clone (today, just the zone
+            // pointer) - not the other way around.
             if (m_EntityManager.TryGetComponent<ObjectGeometryData>(templateBuildingEntity, out var geometry))
                 m_EntityManager.SetComponentData(clonedBuildingEntity, geometry);
 
             if (m_EntityManager.TryGetComponent<BuildingData>(templateBuildingEntity, out var buildingData))
                 m_EntityManager.SetComponentData(clonedBuildingEntity, buildingData);
 
+            CopyAllBuffers(templateBuildingEntity, clonedBuildingEntity);
+
+            RunComponentLifecycle(clonedBuildingPrefab, clonedBuildingEntity);
+
+            m_EntityManager.SetSharedComponent(clonedBuildingEntity, new BuildingSpawnGroupData(clonedZoneType));
+
             m_EntityManager.RemoveComponent<Created>(clonedBuildingEntity);
             m_EntityManager.RemoveComponent<Updated>(clonedBuildingEntity);
+        }
+
+        // Discovers every DynamicBuffer<T> type actually present on
+        // source's archetype (same technique Game.Prefabs.ReplacePrefabSystem
+        // itself uses to inspect an entity's live component set:
+        // EntityManager.GetChunk(entity).Archetype.GetComponentTypes())
+        // and mirrors each one onto destination, rather than hand-copying
+        // one named buffer type at a time - every round of in-game testing
+        // turned up a different buffer ObjectInitializeSystem would
+        // normally have populated (SubMesh, then SubObject; there's no
+        // documented list of what ObjectGeometryPrefab/BuildingPrefab's
+        // full buffer set is, so there's no reason to expect those are the
+        // last two). ComponentType.IsBuffer distinguishes buffers from
+        // plain IComponentData/tag/shared types in the same archetype;
+        // destination is skipped per-type if it doesn't declare that
+        // buffer itself (nothing to copy into - e.g. a buffer type only
+        // present because of some other component this specific prefab
+        // doesn't have). The actual element copy has to go through
+        // reflection (MakeGenericMethod) since EntityManager.GetBuffer<T>
+        // needs a compile-time T and ComponentType only gives us a
+        // System.Type at runtime.
+        private static readonly MethodInfo CopyBufferMethod =
+            typeof(ManualPrefabInitializationWorkaround).GetMethod(nameof(CopyBuffer), BindingFlags.NonPublic | BindingFlags.Instance);
+
+        private void CopyAllBuffers(Entity source, Entity destination)
+        {
+            var componentTypes = m_EntityManager.GetChunk(source).Archetype.GetComponentTypes();
+            try
+            {
+                foreach (var componentType in componentTypes)
+                {
+                    if (!componentType.IsBuffer || !m_EntityManager.HasComponent(destination, componentType))
+                        continue;
+
+                    CopyBufferMethod.MakeGenericMethod(componentType.GetManagedType()).Invoke(this, new object[] { source, destination });
+                }
+            }
+            finally
+            {
+                componentTypes.Dispose();
+            }
+        }
+
+        private void CopyBuffer<T>(Entity source, Entity destination) where T : unmanaged, IBufferElementData
+        {
+            if (!m_EntityManager.TryGetBuffer<T>(source, true, out var sourceBuffer))
+                return;
+
+            var destinationBuffer = m_EntityManager.GetBuffer<T>(destination, false);
+            destinationBuffer.Clear();
+            for (var i = 0; i < sourceBuffer.Length; i++)
+                destinationBuffer.Add(sourceBuffer[i]);
         }
 
         // Mirrors PrefabInitializeSystem.InitializePrefab/LateInitializePrefab's

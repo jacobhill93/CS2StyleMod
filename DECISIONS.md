@@ -123,20 +123,22 @@ line ourselves, manually, right after `AddPrefab`, has no effect either.
 **Workaround, not a fix** (`ManualPrefabInitializationWorkaround.cs`, kept
 deliberately separate from `ZonePrefabCloner`/`SpawnableBuildingZoneLinker`
 so it can be deleted alone if the real cause is ever found):
-1. Call `ComponentBase.Initialize`/`LateInitialize` directly on every
+1. Copy `ObjectGeometryData`/`BuildingData`, then every `DynamicBuffer<T>`
+   the template entity has, straight onto the clone - *before* step 3, not
+   after (see "Buffer gap found via real `Collection` orchestration" below
+   for why order matters here).
+2. Call `ComponentBase.Initialize`/`LateInitialize` directly on every
    component attached to the clone - the literal methods
    `PrefabInitializeSystem` would have called. Covers anything a component
    sets itself (`ZonePropertiesData`, `UIObjectData` + its group buffer,
-   `SpawnableBuildingData`, `BuildingPropertyData`, ...) generically.
-2. Reflect into `ZoneSystem`'s private `m_ZonePrefabs` list to assign/
+   `SpawnableBuildingData`, `BuildingPropertyData`, ...) generically, and
+   runs after step 1 so anything it correctly computes per-clone (today:
+   just the zone pointer) overrides the template mirror instead of being
+   stomped by it.
+3. Reflect into `ZoneSystem`'s private `m_ZonePrefabs` list to assign/
    register a `ZoneType` index, and into its private `UpdateZoneColors()`
    to refresh the shader-global color arrays the zone-painting tool reads -
    both bespoke to `ZoneSystem` itself, not any component's method.
-3. Copy `ObjectGeometryData`/`BuildingData` straight from the template
-   entity - `ObjectInitializeSystem` computes these from mesh data via no
-   component method at all, but they're identical between clone and
-   template anyway (same mesh, same lot size), so copying is both correct
-   and simpler than re-deriving them.
 
 Confirmed in-game end-to-end after all three: a cloned zone is visible,
 named, correctly colored, paintable, and spawns only the cloned building,
@@ -144,6 +146,66 @@ correctly positioned, surviving construction. **Still unknown**: why none of
 these systems fire in the first place. Worth revisiting if District Themes
 or anything else ever needs a runtime-cloned prefab again - this workaround
 would need to be reapplied, not assumed fixed.
+
+### Buffer gap found via real `Collection` orchestration (2026-10-08)
+The end-to-end proof above used one hardcoded building. Once
+`GameBuildingCatalog`/`CustomZoneBuilder` replaced that with real
+`Collection` data resolving ~416 vanilla buildings, two more gaps in the
+same "never processed by `ObjectInitializeSystem`" root cause turned up,
+both `DynamicBuffer<T>` component types that step 1 above didn't yet copy
+(it only copied the two plain `IComponentData` types, geometry/lot size):
+
+- **`Game.Prefabs.SubMesh`** - the actual renderable mesh reference(s); an
+  empty buffer meant the building had correct geometry/lot data but no
+  mesh to render at all (construction completed, nothing appeared).
+- **`Game.Prefabs.SubObject`** - the prefab-side list of decorative
+  sub-objects (fences, chimneys, driveway props). Read at *per-instance*
+  spawn time by `Game.Objects.SubObjectSystem` (a separate runtime system,
+  not a `Created`-tag prefab-init one) to decide what child entities to
+  create. An empty buffer meant zero sub-objects ever spawned for any
+  clone, even though the building itself rendered fine.
+
+Rather than keep discovering buffer types one at a time, step 1 now
+discovers every `DynamicBuffer<T>` on the template's live archetype
+generically (`EntityManager.GetChunk(entity).Archetype.GetComponentTypes()`,
+filtered to `ComponentType.IsBuffer` - the same technique
+`Game.Prefabs.ReplacePrefabSystem` itself uses to inspect an entity's
+component set) and mirrors each one via reflection (`MakeGenericMethod`
+over a generic `CopyBuffer<T>`), rather than hand-naming `SubMesh`, then
+`SubObject`, then whatever turns up next. Safe because every buffer found
+on a *prefab* entity (not a live building instance) is template-defining
+data meant to be identical across every clone of that prefab - nothing
+instance-specific lives there.
+
+A third, related bug surfaced once sub-objects started spawning: lot
+fences (also `SubObject` entries, `EdgePlacement`-flagged) came out
+partial/stopping halfway. Cause was ordering, not content:
+`Game.Objects.SubObjectSystem.CreateSubObjects` computes fence placement
+from the owner building's actual `ObjectGeometryData`/lot size at
+placement time, and that data was only being copied from the template
+*after* `ComponentBase.Initialize`/`LateInitialize` ran (step 2), so
+anything reading it during step 2 saw zeroed defaults. Moving the
+geometry/buffer copy to run first (now step 1) fixed it. Varied fence
+*style* per lot (not coverage) is expected vanilla behavior - the game
+randomly selects among fence variants per instance by design, confirmed
+by comparing a clone against a vanilla building of the same type.
+
+### Signature buildings are excluded from the catalog, not just uncloneable
+The 12 vanilla `...Signature01/02/03`/`...WaterfrontSignature0N` buildings
+(both EU and NA residential-low themes) were resolving as ordinary
+`VanillaSelectorEntry` candidates, then failing to clone -
+`SpawnableBuildingZoneLinker` correctly requires a `SpawnableBuilding`
+component on the prefab, and Signature buildings carry `SignatureBuilding`
+instead (confirmed in `Game.Prefabs.SignatureBuilding.cs`); it sets
+`SpawnableBuildingData` directly in its own `LateInitialize`, which is why
+they passed `GameBuildingCatalog`'s `EntityQuery` (keyed on that component)
+despite not actually being regular growables. Signature buildings are
+one-per-city unique landmarks with their own unlock/leveling model
+(`PlacementFlags.Unique`, fixed `m_Level = 5`) placed as rewards, not grown
+- they should never spawn in a zone regardless of whether cloning them
+could be made to work. Fixed at the source: `GameBuildingCatalog.TryDescribeBuilding`
+now rejects any entity with `SignatureBuildingData` before it's ever
+presented as a candidate, rather than letting it surface and fail later.
 
 ### Demand is shared with vanilla, by design
 `ResidentialDemandSystem`/`CommercialDemandSystem`/`IndustrialDemandSystem`
