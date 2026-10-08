@@ -89,105 +89,104 @@ Verified against the decompiled `Game.dll` (see `TOUCHPOINTS.md`):
 - This resolves three of the open questions below outright and confirms the
   "lower technical risk" guess in Build order.
 
-**Update after real playtesting (2026-10-08): confirmed true, but not for
-free.** Cloning + `AddPrefab` alone leaves the clone permanently
-uninitialized - see "A runtime-cloned prefab is never processed by any
-`Created`-tag-keyed system" below. The claim above ("vanilla's spawn/level-up
-systems naturally restrict themselves") is still correct once the clone is
-properly initialized; getting it there is the hard part, not covered by
-this decision.
+**Update (2026-10-08): confirmed true, no caveats.** The clone only ever
+looked permanently uninitialized because of *when* it was being created,
+not because anything about initialization itself was broken - see "A
+runtime-cloned prefab is only visible to init systems for one frame" below
+for the real mechanism and fix. Once a clone is added at the right point in
+the frame, vanilla's spawn/level-up systems restrict themselves to it with
+zero further work, exactly as this decision originally claimed.
 
-### A runtime-cloned prefab is never processed by any Created-tag-keyed system
-**Root cause unknown.** `PrefabSystem.AddPrefab`, called after initial load
-(i.e. not during the game's own startup prefab scan), registers the entity
-correctly - but no system that normally initializes a *newly-loaded* prefab
-by querying `Created + PrefabData` ever fires for it. Confirmed across three
-independent, unrelated systems that all key on exactly that query:
-`ZoneSystem.InitializeZonePrefabs` (never assigns a `ZoneType` index, never
-touches the zone's own private prefab registry), `PrefabInitializeSystem`
-(never calls any component's `Initialize`/`LateInitialize`), and
-`ObjectInitializeSystem` (never computes `ObjectGeometryData` from the
-mesh). Ruled out as explanations, each via an actual in-game test: wrong
-registration phase (tried both `SystemUpdatePhase.PrefabUpdate` and
-`MainLoop` + `UpdateBefore<_, PrefabSystem>` - the latter being the exact
-pattern a real published mod, DillonN/specialized-industrial-zones, uses for
-the same kind of clone); timing (tried cloning synchronously in
-`OnGameLoaded` and deferred 30 real `OnUpdate` ticks later - identical
-failure); zone type (Residential and Industrial fail identically); mod
-conflicts (reproduced with zero other mods enabled). Also ruled out:
-`PrefabSystem.OnUpdate()` itself unconditionally calls
-`UpdateSystem.Update(SystemUpdatePhase.PrefabUpdate)` every tick with no
-reentrancy guard (confirmed by reading its source) - calling that exact
-line ourselves, manually, right after `AddPrefab`, has no effect either.
+### A runtime-cloned prefab is only visible to init systems for one frame
+**Root cause found (2026-10-08), via three parallel deep-read agents
+(one on `ObjectInitializeSystem`'s own query/gating logic, one on
+`PrefabSystem`'s boot-vs-runtime code paths, one comparing against
+DillonN/specialized-industrial-zones' real published source) - the second
+two converged independently on the identical mechanism with matching
+`SystemOrder.cs`/`PrefabSystem.cs` line citations.** It was never a missing
+initialization step. `Created`/`Updated` are ordinary zero-size tags
+(`Game.Common.Created : IComponentData, IQueryTypeParameter` - nothing
+automatic about them) that get added by `PrefabSystem.AddPrefab` and then
+live for exactly one frame:
 
-**Workaround, not a fix** (`ManualPrefabInitializationWorkaround.cs`, kept
-deliberately separate from `ZonePrefabCloner`/`SpawnableBuildingZoneLinker`
-so it can be deleted alone if the real cause is ever found):
-1. Copy `ObjectGeometryData`/`BuildingData`, then every `DynamicBuffer<T>`
-   the template entity has, straight onto the clone - *before* step 3, not
-   after (see "Buffer gap found via real `Collection` orchestration" below
-   for why order matters here).
-2. Call `ComponentBase.Initialize`/`LateInitialize` directly on every
-   component attached to the clone - the literal methods
-   `PrefabInitializeSystem` would have called. Covers anything a component
-   sets itself (`ZonePropertiesData`, `UIObjectData` + its group buffer,
-   `SpawnableBuildingData`, `BuildingPropertyData`, ...) generically, and
-   runs after step 1 so anything it correctly computes per-clone (today:
-   just the zone pointer) overrides the template mirror instead of being
-   stomped by it.
-3. Reflect into `ZoneSystem`'s private `m_ZonePrefabs` list to assign/
-   register a `ZoneType` index, and into its private `UpdateZoneColors()`
-   to refresh the shader-global color arrays the zone-painting tool reads -
-   both bespoke to `ZoneSystem` itself, not any component's method.
+- `PrefabSystem.OnUpdate` drives the `PrefabUpdate` phase (the one pass
+  `ZoneSystem.InitializeZonePrefabs`/`PrefabInitializeSystem`/
+  `ObjectInitializeSystem` all run under) from a fixed point in
+  `SystemUpdatePhase.MainLoop`.
+- `LoadGameSystem` - which is what actually dispatches every system's
+  `OnGameLoaded` callback - is registered in that *same* `MainLoop` phase,
+  but *after* `PrefabSystem` (`Game.Common.SystemOrder.cs`: `PrefabSystem`
+  added before `LoadGameSystem`, and `UpdateSystem.SystemData.CompareTo`
+  sorts same-phase systems by registration order).
+- So a clone added from `OnGameLoaded` always misses that frame's
+  `PrefabUpdate` pass - it doesn't exist yet when `PrefabSystem` ticks.
+- `PrepareCleanUpSystem` (matches `Any={Created, Updated, ...}`) and
+  `CleanUpSystem` (strips exactly those types) are also scheduled in
+  `MainLoop`/`Cleanup`, *after* `LoadGameSystem` - so by the next frame,
+  before `PrefabUpdate` ever gets a second look, the tags are already gone.
+  Permanently invisible to every `Created`-keyed system from then on.
 
-Confirmed in-game end-to-end after all three: a cloned zone is visible,
-named, correctly colored, paintable, and spawns only the cloned building,
-correctly positioned, surviving construction. **Still unknown**: why none of
-these systems fire in the first place. Worth revisiting if District Themes
-or anything else ever needs a runtime-cloned prefab again - this workaround
-would need to be reapplied, not assumed fixed.
+This is also why none of the things tried under the old "root cause
+unknown" writeup changed anything: `SystemUpdatePhase.PrefabUpdate` vs.
+`MainLoop` + `UpdateBefore<_, PrefabSystem>` only controls *our own*
+system's position, not `LoadGameSystem`'s (which is what actually calls
+`OnGameLoaded`, fixed regardless); deferring 30 ticks doesn't help once the
+tags are already stripped; and manually re-invoking
+`UpdateSystem.Update(SystemUpdatePhase.PrefabUpdate)` right after
+`AddPrefab` doesn't work because that call re-enters `Update()` from
+*inside* the outer `Update(MainLoop)` loop already in progress, and
+`Refresh()` clears the update list mid-iteration if it's dirty - corrupting
+the outer loop rather than doing anything useful.
 
-### Buffer gap found via real `Collection` orchestration (2026-10-08)
-The end-to-end proof above used one hardcoded building. Once
-`GameBuildingCatalog`/`CustomZoneBuilder` replaced that with real
-`Collection` data resolving ~416 vanilla buildings, two more gaps in the
-same "never processed by `ObjectInitializeSystem`" root cause turned up,
-both `DynamicBuffer<T>` component types that step 1 above didn't yet copy
-(it only copied the two plain `IComponentData` types, geometry/lot size):
+**The fix**: never call `AddPrefab`-triggering code from `OnGameLoaded` (or
+any other arbitrary call site) directly. Register a dedicated system with
+`updateSystem.UpdateBefore<_, PrefabSystem>(SystemUpdatePhase.MainLoop)`
+(the exact registration DillonN/specialized-industrial-zones - a real
+published mod that clones full `BuildingPrefab`s at runtime with zero
+workaround - uses) and do the actual cloning from *that system's*
+`OnUpdate`, not from `OnGameLoaded`. That lands `AddPrefab` immediately
+before `PrefabSystem`'s own tick, in the same frame, every time - the one
+window a clone needs to be visible during. `CustomZoneBuildRequestSystem`
+is what makes this a property of the architecture rather than a thing every
+future caller has to remember: it owns a pending-request queue, callable
+from anywhere (including `OnGameLoaded`, a UI handler, wherever), and only
+ever actually calls `CustomZoneBuilder.Build` from its own correctly-timed
+`OnUpdate`.
 
-- **`Game.Prefabs.SubMesh`** - the actual renderable mesh reference(s); an
-  empty buffer meant the building had correct geometry/lot data but no
-  mesh to render at all (construction completed, nothing appeared).
-- **`Game.Prefabs.SubObject`** - the prefab-side list of decorative
-  sub-objects (fences, chimneys, driveway props). Read at *per-instance*
-  spawn time by `Game.Objects.SubObjectSystem` (a separate runtime system,
-  not a `Created`-tag prefab-init one) to decide what child entities to
-  create. An empty buffer meant zero sub-objects ever spawned for any
-  clone, even though the building itself rendered fine.
+Confirmed in-game (2026-10-08) via a throwaway experiment
+(`DebugTimingExperimentSystem.cs`, since removed) that used *only*
+`ZonePrefabCloner`/`SpawnableBuildingZoneLinker` - no manual
+reinitialization of any kind - registered this way: the cloned zone got a
+real `ZoneType` index, correct color/paint behavior, `Created`/`Updated`
+cleanly removed by the real `CleanUpSystem`; the cloned building's
+`ObjectGeometryData`, `SubMesh` buffer, `SubObject` buffer (42 entries), and
+`BuildingSpawnGroupData.m_ZoneType` (matching the zone's own index exactly)
+were all populated by the real game systems, no copying required.
+`ManualPrefabInitializationWorkaround.cs` is deleted as of this fix - it
+solved a real set of symptoms, but by reimplementing what the real systems
+do rather than fixing why they didn't run; now that they do run, every
+field it used to hand-copy (`ObjectGeometryData`, `BuildingData`, `SubMesh`,
+`SubObject`, `BuildingSpawnGroupData`, the `ZoneSystem` zone-registry
+reflection, `UpdateZoneColors()`) is the real systems' job again.
 
-Rather than keep discovering buffer types one at a time, step 1 now
-discovers every `DynamicBuffer<T>` on the template's live archetype
-generically (`EntityManager.GetChunk(entity).Archetype.GetComponentTypes()`,
-filtered to `ComponentType.IsBuffer` - the same technique
-`Game.Prefabs.ReplacePrefabSystem` itself uses to inspect an entity's
-component set) and mirrors each one via reflection (`MakeGenericMethod`
-over a generic `CopyBuffer<T>`), rather than hand-naming `SubMesh`, then
-`SubObject`, then whatever turns up next. Safe because every buffer found
-on a *prefab* entity (not a live building instance) is template-defining
-data meant to be identical across every clone of that prefab - nothing
-instance-specific lives there.
-
-A third, related bug surfaced once sub-objects started spawning: lot
-fences (also `SubObject` entries, `EdgePlacement`-flagged) came out
-partial/stopping halfway. Cause was ordering, not content:
-`Game.Objects.SubObjectSystem.CreateSubObjects` computes fence placement
-from the owner building's actual `ObjectGeometryData`/lot size at
-placement time, and that data was only being copied from the template
-*after* `ComponentBase.Initialize`/`LateInitialize` ran (step 2), so
-anything reading it during step 2 saw zeroed defaults. Moving the
-geometry/buffer copy to run first (now step 1) fixed it. Varied fence
-*style* per lot (not coverage) is expected vanilla behavior - the game
-randomly selects among fence variants per instance by design, confirmed
+### Buffer gaps found via real `Collection` orchestration (2026-10-08, historical)
+Before the timing root cause above was found, the first end-to-end proof
+(one hardcoded building, via the now-deleted workaround) didn't generalize:
+once `GameBuildingCatalog`/`CustomZoneBuilder` resolved real `Collection`
+data against ~416 vanilla buildings, two more gaps turned up in the
+workaround's manual copying - `Game.Prefabs.SubMesh` (the renderable mesh
+reference; empty meant nothing to render at all) and `Game.Prefabs.SubObject`
+(the prefab-side decorative-sub-object list read by
+`Game.Objects.SubObjectSystem`; empty meant no fences/chimneys/etc. ever
+spawned). A third bug - lot fences coming out partial/stopping halfway -
+turned out to be copy *ordering*, not missing content: fence placement
+reads the owner's `ObjectGeometryData` at placement time, which the
+workaround was copying too late. All three are moot now that the real
+systems run on their own, but the underlying facts remain useful context:
+`SubMesh`/`SubObject` are genuine `DynamicBuffer<T>` components on a
+building prefab, and fence coverage genuinely does depend on
+`ObjectGeometryData` being correct by the time anything places them. Varied
+fence *style* per lot (not coverage) is expected vanilla behavior, confirmed
 by comparing a clone against a vanilla building of the same type.
 
 ### Signature buildings are excluded from the catalog, not just uncloneable

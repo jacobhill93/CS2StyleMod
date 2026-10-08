@@ -2,8 +2,11 @@
 using Colossal.Logging;
 using Colossal.PSI.Environment;
 using CS2StyleMod.Core;
+using CS2StyleMod.CustomZones;
 using Game;
+using Game.Common;
 using Game.Modding;
+using Game.Prefabs;
 using Game.SceneFlow;
 using System.IO;
 
@@ -35,6 +38,14 @@ namespace CS2StyleMod
             m_Setting.RegisterInOptionsUI();
             GameManager.instance.localizationManager.AddSource("en-US", new LocaleEN(m_Setting));
             AssetDatabase.global.LoadSettings(nameof(CS2StyleMod), m_Setting, new Setting(this));
+
+            // CustomZoneBuildRequestSystem owns the one timing requirement
+            // a runtime-cloned prefab has - see DECISIONS.md "A
+            // runtime-cloned prefab is only visible to init systems for one
+            // frame". Must be registered exactly this way: MainLoop,
+            // UpdateBefore<_, PrefabSystem>, so its OnUpdate always lands
+            // immediately before PrefabSystem's own tick in the same frame.
+            updateSystem.UpdateBefore<CustomZoneBuildRequestSystem, PrefabSystem>(SystemUpdatePhase.MainLoop);
         }
 
         public void OnDispose()

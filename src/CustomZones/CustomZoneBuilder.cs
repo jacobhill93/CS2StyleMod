@@ -1,4 +1,4 @@
-﻿using Colossal;
+using Colossal;
 using CS2StyleMod.Core;
 using CS2StyleMod.CustomZones.GameAdapters;
 using Game.Prefabs;
@@ -13,11 +13,15 @@ namespace CS2StyleMod.CustomZones
     // GameAdapters layer. Turns a Collection into an actual playable zone:
     // resolves its entries through GameBuildingCatalog, then clones the
     // zone and each resolved building via ZonePrefabCloner/
-    // SpawnableBuildingZoneLinker, patched up by
-    // ManualPrefabInitializationWorkaround. This is the real,
-    // Collection-driven version of what the deleted debug test harness
-    // proved by hand with hardcoded names - see TOUCHPOINTS.md/
-    // DECISIONS.md for what that proved and why the workaround exists.
+    // SpawnableBuildingZoneLinker. That's genuinely all it takes - see
+    // DECISIONS.md "A runtime-cloned prefab is only visible to init
+    // systems for one frame" for why no further manual initialization is
+    // needed (it used to be, via a since-deleted workaround, before that
+    // root cause was found). The one thing that actually matters: Build()
+    // must only ever be called from CustomZoneBuildRequestSystem's own
+    // OnUpdate, never directly from OnGameLoaded or any other call site -
+    // that system exists specifically to own this timing requirement so
+    // nothing else has to remember it.
     //
     // Depends on the concrete GameAdapters directly, not interfaces -
     // consistent with how they depend on each other, and there's no
@@ -30,7 +34,6 @@ namespace CS2StyleMod.CustomZones
         private readonly PrefabUISystem m_PrefabUISystem;
         private readonly ZonePrefabCloner m_ZoneCloner;
         private readonly SpawnableBuildingZoneLinker m_BuildingLinker;
-        private readonly ManualPrefabInitializationWorkaround m_Workaround;
         private readonly GameBuildingCatalog m_Catalog;
 
         public CustomZoneBuilder(World world, GameBuildingCatalog catalog)
@@ -39,7 +42,6 @@ namespace CS2StyleMod.CustomZones
             m_PrefabUISystem = world.GetOrCreateSystemManaged<PrefabUISystem>();
             m_ZoneCloner = new ZonePrefabCloner(m_PrefabSystem);
             m_BuildingLinker = new SpawnableBuildingZoneLinker(m_PrefabSystem);
-            m_Workaround = new ManualPrefabInitializationWorkaround(world);
             m_Catalog = catalog;
         }
 
@@ -67,17 +69,10 @@ namespace CS2StyleMod.CustomZones
                 return null;
             }
 
-            // The game's own ZoneType (a fresh index), not Core.ZoneType -
-            // the game one is what BuildingSpawnGroupData/
-            // InitializeClonedBuilding need below.
-            var newZoneType = m_Workaround.InitializeClonedZone(clonedZone, clonedZoneEntity);
-
             // PrefabUISystem resolves a prefab's display name to a locale
             // key like "Assets.NAME[<prefab name>]" - with no locale entry
             // for a freshly-cloned name, the UI shows blank. Register one
-            // directly (same fix the deleted debug harness had - ported
-            // here instead of left in debug-only code, since any real
-            // caller needs this too).
+            // directly.
             RegisterDisplayName(clonedZoneEntity, newZoneName);
 
             var clonedPrefabIds = new HashSet<string>();
@@ -90,13 +85,13 @@ namespace CS2StyleMod.CustomZones
                     case VanillaSelectorEntry selector:
                         foreach (var candidate in m_Catalog.Resolve(selector))
                         {
-                            if (CloneOneBuilding(candidate.PrefabId, clonedZone, newZoneName, newZoneType, clonedPrefabIds))
+                            if (CloneOneBuilding(candidate.PrefabId, clonedZone, newZoneName, clonedPrefabIds))
                                 clonedCount++;
                         }
                         break;
 
                     case ExplicitAssetEntry explicitEntry:
-                        if (CloneOneBuilding(explicitEntry.PrefabId, clonedZone, newZoneName, newZoneType, clonedPrefabIds))
+                        if (CloneOneBuilding(explicitEntry.PrefabId, clonedZone, newZoneName, clonedPrefabIds))
                             clonedCount++;
                         break;
 
@@ -110,12 +105,12 @@ namespace CS2StyleMod.CustomZones
             return clonedZone;
         }
 
-        private bool CloneOneBuilding(string prefabId, ZonePrefab clonedZone, string newZoneName, Game.Zones.ZoneType newZoneType, HashSet<string> clonedPrefabIds)
+        private bool CloneOneBuilding(string prefabId, ZonePrefab clonedZone, string newZoneName, HashSet<string> clonedPrefabIds)
         {
             if (!clonedPrefabIds.Add(prefabId))
                 return false; // already cloned for this zone via another entry/collection.
 
-            if (!m_Catalog.TryGetBuildingPrefab(prefabId, out var templateBuilding, out var templateBuildingEntity))
+            if (!m_Catalog.TryGetBuildingPrefab(prefabId, out var templateBuilding, out _))
             {
                 Mod.log.Warn($"[CustomZoneBuilder] Could not resolve building prefab '{prefabId}' for zone '{newZoneName}' - skipping.");
                 return false;
@@ -134,7 +129,6 @@ namespace CS2StyleMod.CustomZones
                 return false;
             }
 
-            m_Workaround.InitializeClonedBuilding(clonedBuilding, templateBuildingEntity, clonedBuildingEntity, newZoneType);
             RegisterDisplayName(clonedBuildingEntity, $"{newZoneName} - {templateBuilding.name}");
             return true;
         }
