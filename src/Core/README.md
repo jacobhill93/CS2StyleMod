@@ -19,6 +19,12 @@ spawn code lives here — see `../CustomZones/GameAdapters` and
   persist in a global library, referenced by GUID"). Pure BCL + Newtonsoft -
   no game dependency; `Mod.cs` is the only place that decides *where* the
   file lives (via `Colossal.PSI.Environment.EnvPath`) and wires it up.
+- `CustomZoneDefinition.cs`, `ICustomZoneDefinitionLibrary.cs`,
+  `JsonFileCustomZoneDefinitionLibrary.cs` — a persisted, user-defined
+  custom zone: a base `ZoneType` plus the `Collection` Id(s) it should pull
+  buildings from. Same rename-free, GUID-keyed persistence shape as
+  `Collection`, stored in its own file. What actually turns one into an
+  in-game zone lives in `../CustomZones/CustomZoneBuilder.cs`.
 
 All unit-tested without the game in `../../tests/CS2StyleMod.Core.Tests`
 (run with `dotnet test tests/CS2StyleMod.Core.Tests`).

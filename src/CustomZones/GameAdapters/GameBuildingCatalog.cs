@@ -115,6 +115,31 @@ namespace CS2StyleMod.CustomZones.GameAdapters
             return new BuildingCandidate(entry.PrefabId, entry.Settings.Category, entry.Settings.Level, entry.Settings.LotSize);
         }
 
+        // Not part of IBuildingCatalog. Used by CustomZoneBuilder's rebuild
+        // path to find every building it already cloned for a given zone,
+        // by the stable internal name prefix it clones them under - lets
+        // rebuild tell "already have this one" from "need to clone this
+        // one" without tracking any extra state of its own.
+        public IEnumerable<(BuildingPrefab Prefab, Entity Entity)> FindBuildingsByNamePrefix(string namePrefix)
+        {
+            var results = new List<(BuildingPrefab, Entity)>();
+            var buildingEntities = m_BuildingQuery.ToEntityArray(Allocator.Temp);
+            try
+            {
+                foreach (var buildingEntity in buildingEntities)
+                {
+                    if (m_PrefabSystem.TryGetPrefab<BuildingPrefab>(buildingEntity, out var prefab) && prefab.name.StartsWith(namePrefix))
+                        results.Add((prefab, buildingEntity));
+                }
+            }
+            finally
+            {
+                buildingEntities.Dispose();
+            }
+
+            return results;
+        }
+
         private bool TryDescribeBuilding(Entity buildingEntity, out BuildingCandidate candidate)
         {
             candidate = null;
@@ -163,7 +188,10 @@ namespace CS2StyleMod.CustomZones.GameAdapters
         // ZonePropertiesData back to Core's own ZoneType enum. Returns
         // false for anything that doesn't correspond to one of Core's
         // seven categories (e.g. AreaType.None).
-        private static bool TryMapToCoreZoneType(ZoneData zoneData, ZonePropertiesData zoneProps, out CoreZoneType zoneType)
+        // internal, not private - GameZonePrefabResolver reuses this exact
+        // mapping to resolve a vanilla ZonePrefab by Core.ZoneType category
+        // (the inverse direction), rather than duplicating the switch.
+        internal static bool TryMapToCoreZoneType(ZoneData zoneData, ZonePropertiesData zoneProps, out CoreZoneType zoneType)
         {
             var density = PropertyUtils.GetZoneDensity(zoneData, zoneProps);
             var isOffice = zoneData.IsOffice();

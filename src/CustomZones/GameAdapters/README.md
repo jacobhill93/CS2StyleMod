@@ -37,25 +37,47 @@ DECISIONS.md for the confirmed root cause and fix.
   live game's registered buildings. Also exposes `TryGetBuildingPrefab`
   (not part of `IBuildingCatalog` - Core only deals in plain
   `BuildingCandidate` values) for feature logic that needs the actual
-  prefab to clone, not just a description of it. Excludes Signature
-  buildings (one-per-city landmarks, not regular growables) from every
-  result.
+  prefab to clone, not just a description of it, and
+  `FindBuildingsByNamePrefix` (used by the rebuild path below to find what
+  it already cloned for a given zone). Excludes Signature buildings
+  (one-per-city landmarks, not regular growables) from every result.
+- `GameZonePrefabResolver.cs` — resolves `ZonePrefab`s: either a vanilla
+  zone matching a `Core.ZoneType` category (to clone as a new custom zone's
+  simulation template), or an already-registered zone by its exact internal
+  name (to find a zone `CustomZoneBuilder` built in an earlier request, for
+  rebuild). Reuses `GameBuildingCatalog`'s `AreaType`/density mapping
+  (`internal`, not duplicated) rather than guessing the inverse direction
+  itself.
 
 `../CustomZoneBuilder.cs` (one level up - feature logic, not a
-touchpoint-specific adapter) is what actually uses this: given a vanilla
-zone + a name + some `Collection`s, it resolves every entry through the
-catalog above and clones the zone and each distinct building via the two
-adapters in this folder. Adopted assets are skipped with a warning - they
-need their own GameAdapter to give an arbitrary building growable data
-first, not yet built. `Build()` must only ever be called from
+touchpoint-specific adapter) is what actually uses these: given a
+`Core.CustomZoneDefinition` + its referenced `Collection`s, `BuildOrRebuild`
+resolves every entry through `GameBuildingCatalog` and clones the zone and
+each distinct building via `ZonePrefabCloner`/`SpawnableBuildingZoneLinker`.
+Adopted assets are skipped with a warning - they need their own GameAdapter
+to give an arbitrary building growable data first, not yet built.
+`BuildOrRebuild` must only ever be called from
 `../CustomZoneBuildRequestSystem.cs`'s own `OnUpdate` - never directly -
 for the same timing reason as above.
 
-**Confirmed in-game (2026-10-08)**, with real `Collection` data resolving
-the full ~416-building vanilla selector plus an explicit asset: every
-building renders, their sub-objects (fences, chimneys, driveway props,
-etc.) spawn correctly, and the 12 vanilla Signature buildings are
-correctly excluded rather than surfacing as clone failures. Re-confirmed
-again after `ManualPrefabInitializationWorkaround` was deleted and
-`CustomZoneBuildRequestSystem` took over - identical results, zero manual
-reinitialization. See TOUCHPOINTS.md/DECISIONS.md.
+**Rebuild-safe by construction (2026-10-08)**: every zone/building prefab
+this builds gets a name derived from `CustomZoneDefinition.Id`
+(`CS2StyleMod.Zone.<guid>[.<template prefab name>]`), never from its
+user-facing `Name` - so calling `BuildOrRebuild` again for the same
+definition (e.g. after editing one of its Collections) finds what it built
+before by that stable name instead of creating a duplicate. A building
+newly resolved that wasn't cloned before gets cloned (additive); one that
+was cloned before but isn't resolved anymore gets its
+`BuildingSpawnGroupData` cleared (zone index 0 - never a real zone) so it
+stops being offered for new construction, without touching the entity or
+anything already built from it - see DECISIONS.md "Removing an asset
+doesn't touch what's already built."
+
+**Confirmed in-game (2026-10-08)**, both the original build path (real
+`Collection` data resolving the full ~416-building vanilla selector plus an
+explicit asset - every building renders, sub-objects spawn correctly,
+Signature buildings correctly excluded) and the rebuild path (requesting
+the same definition three times in one load: fresh build, additive
+rebuild adding the full selector, then a rebuild dropping the explicit
+asset - confirmed via the zone showing variety and the dropped asset never
+appearing in freshly-grown buildings). See TOUCHPOINTS.md/DECISIONS.md.

@@ -4,24 +4,25 @@ using CS2StyleMod.CustomZones.GameAdapters;
 using Game.Prefabs;
 using Game.SceneFlow;
 using Game.UI.InGame;
+using System;
 using System.Collections.Generic;
 using Unity.Entities;
 
 namespace CS2StyleMod.CustomZones
 {
     // Feature logic for Custom Zones - the first thing above the
-    // GameAdapters layer. Turns a Collection into an actual playable zone:
-    // resolves its entries through GameBuildingCatalog, then clones the
-    // zone and each resolved building via ZonePrefabCloner/
-    // SpawnableBuildingZoneLinker. That's genuinely all it takes - see
-    // DECISIONS.md "A runtime-cloned prefab is only visible to init
-    // systems for one frame" for why no further manual initialization is
-    // needed (it used to be, via a since-deleted workaround, before that
-    // root cause was found). The one thing that actually matters: Build()
-    // must only ever be called from CustomZoneBuildRequestSystem's own
-    // OnUpdate, never directly from OnGameLoaded or any other call site -
-    // that system exists specifically to own this timing requirement so
-    // nothing else has to remember it.
+    // GameAdapters layer. Turns a CustomZoneDefinition into an actual
+    // playable zone: resolves its referenced Collections' entries through
+    // GameBuildingCatalog, then clones the zone and each resolved building
+    // via ZonePrefabCloner/SpawnableBuildingZoneLinker. That's genuinely
+    // all it takes - see DECISIONS.md "A runtime-cloned prefab is only
+    // visible to init systems for one frame" for why no further manual
+    // initialization is needed. The one thing that actually matters:
+    // BuildOrRebuild must only ever be called from
+    // CustomZoneBuildRequestSystem's own OnUpdate, never directly from
+    // OnGameLoaded or any other call site - that system exists
+    // specifically to own this timing requirement so nothing else has to
+    // remember it.
     //
     // Depends on the concrete GameAdapters directly, not interfaces -
     // consistent with how they depend on each other, and there's no
@@ -30,52 +31,51 @@ namespace CS2StyleMod.CustomZones
     // composes).
     public sealed class CustomZoneBuilder
     {
+        // Prefix for every prefab this builder registers - keeps our
+        // clones trivially distinguishable from vanilla/other-mod prefabs
+        // by name alone, and namespaces the internal naming scheme below.
+        private const string NamePrefix = "CS2StyleMod.Zone.";
+
         private readonly PrefabSystem m_PrefabSystem;
         private readonly PrefabUISystem m_PrefabUISystem;
+        private readonly EntityManager m_EntityManager;
         private readonly ZonePrefabCloner m_ZoneCloner;
         private readonly SpawnableBuildingZoneLinker m_BuildingLinker;
         private readonly GameBuildingCatalog m_Catalog;
+        private readonly GameZonePrefabResolver m_ZoneResolver;
 
         public CustomZoneBuilder(World world, GameBuildingCatalog catalog)
         {
             m_PrefabSystem = world.GetOrCreateSystemManaged<PrefabSystem>();
             m_PrefabUISystem = world.GetOrCreateSystemManaged<PrefabUISystem>();
+            m_EntityManager = world.EntityManager;
             m_ZoneCloner = new ZonePrefabCloner(m_PrefabSystem);
             m_BuildingLinker = new SpawnableBuildingZoneLinker(m_PrefabSystem);
             m_Catalog = catalog;
+            m_ZoneResolver = new GameZonePrefabResolver(world);
         }
 
-        // Clones baseZone as newZoneName, then clones one building per
-        // distinct prefab resolved from the given collections' entries
-        // (vanilla selectors can resolve to many; duplicates across
-        // entries/collections are cloned only once). Adopted assets are
-        // skipped with a warning - they need their own GameAdapter to
-        // give an arbitrary building growable data first, not yet built.
-        // Returns null (logging why) if the zone itself couldn't be
-        // cloned; a building failing to clone is logged and skipped
-        // without aborting the rest.
-        public ZonePrefab Build(ZonePrefab baseZone, string newZoneName, IEnumerable<Collection> collections)
+        // Builds definition fresh the first time, or rebuilds it in place
+        // on every later call - found by its stable internal name (derived
+        // from definition.Id, not its user-facing Name), not by tracking
+        // any extra state of our own. Additive: a building newly resolved
+        // from collections that wasn't cloned before gets cloned now; one
+        // that WAS cloned before but is no longer resolved gets its
+        // BuildingSpawnGroupData cleared (stops being offered for new
+        // construction) without touching the entity itself or anything
+        // already built from it - see DECISIONS.md "Removing an asset
+        // doesn't touch what's already built".
+        public ZonePrefab BuildOrRebuild(CustomZoneDefinition definition, IEnumerable<Collection> collections)
         {
-            var clonedZone = m_ZoneCloner.CloneZone(baseZone, newZoneName);
-            if (clonedZone == null)
-            {
-                Mod.log.Warn($"[CustomZoneBuilder] Failed to clone zone '{baseZone.name}' as '{newZoneName}' - see PrefabSystem's own log output above for why.");
+            var internalZoneName = GetInternalZoneName(definition.Id);
+
+            if (!TryGetOrCloneZone(definition, internalZoneName, out var clonedZone, out var clonedZoneEntity))
                 return null;
-            }
 
-            if (!m_PrefabSystem.TryGetEntity(clonedZone, out var clonedZoneEntity))
-            {
-                Mod.log.Warn($"[CustomZoneBuilder] Cloned zone '{newZoneName}' has no registered Entity despite AddPrefab succeeding - unexpected.");
-                return null;
-            }
+            RegisterDisplayName(clonedZoneEntity, definition.Name);
+            var zoneType = m_EntityManager.GetComponentData<ZoneData>(clonedZoneEntity).m_ZoneType;
 
-            // PrefabUISystem resolves a prefab's display name to a locale
-            // key like "Assets.NAME[<prefab name>]" - with no locale entry
-            // for a freshly-cloned name, the UI shows blank. Register one
-            // directly.
-            RegisterDisplayName(clonedZoneEntity, newZoneName);
-
-            var clonedPrefabIds = new HashSet<string>();
+            var resolvedPrefabIds = new HashSet<string>();
             var clonedCount = 0;
 
             foreach (var entry in EnumerateEntries(collections))
@@ -85,41 +85,91 @@ namespace CS2StyleMod.CustomZones
                     case VanillaSelectorEntry selector:
                         foreach (var candidate in m_Catalog.Resolve(selector))
                         {
-                            if (CloneOneBuilding(candidate.PrefabId, clonedZone, newZoneName, clonedPrefabIds))
+                            if (resolvedPrefabIds.Add(candidate.PrefabId) &&
+                                EnsureBuildingCloned(candidate.PrefabId, clonedZone, zoneType, internalZoneName, definition.Name))
                                 clonedCount++;
                         }
                         break;
 
                     case ExplicitAssetEntry explicitEntry:
-                        if (CloneOneBuilding(explicitEntry.PrefabId, clonedZone, newZoneName, clonedPrefabIds))
+                        if (resolvedPrefabIds.Add(explicitEntry.PrefabId) &&
+                            EnsureBuildingCloned(explicitEntry.PrefabId, clonedZone, zoneType, internalZoneName, definition.Name))
                             clonedCount++;
                         break;
 
                     case AdoptedAssetEntry adopted:
-                        Mod.log.Warn($"[CustomZoneBuilder] Skipping adopted asset '{adopted.PrefabId}' for zone '{newZoneName}' - adopted assets aren't cloneable yet (no GameAdapter gives them growable data).");
+                        Mod.log.Warn($"[CustomZoneBuilder] Skipping adopted asset '{adopted.PrefabId}' for zone '{definition.Name}' - adopted assets aren't cloneable yet (no GameAdapter gives them growable data).");
                         break;
                 }
             }
 
-            Mod.log.Info($"[CustomZoneBuilder] Built zone '{newZoneName}' from '{baseZone.name}' with {clonedCount} building(s).");
+            var retiredCount = RetireBuildingsNoLongerResolved(internalZoneName, resolvedPrefabIds);
+
+            Mod.log.Info($"[CustomZoneBuilder] Built/rebuilt zone '{definition.Name}': {clonedCount} newly cloned, {resolvedPrefabIds.Count} total offered, {retiredCount} retired.");
             return clonedZone;
         }
 
-        private bool CloneOneBuilding(string prefabId, ZonePrefab clonedZone, string newZoneName, HashSet<string> clonedPrefabIds)
+        private bool TryGetOrCloneZone(CustomZoneDefinition definition, string internalZoneName, out ZonePrefab clonedZone, out Entity clonedZoneEntity)
         {
-            if (!clonedPrefabIds.Add(prefabId))
-                return false; // already cloned for this zone via another entry/collection.
+            if (m_ZoneResolver.TryFindByName(internalZoneName, out clonedZone, out clonedZoneEntity))
+                return true; // Already built in an earlier request - rebuilding in place.
 
-            if (!m_Catalog.TryGetBuildingPrefab(prefabId, out var templateBuilding, out _))
+            if (!m_ZoneResolver.TryFindVanillaZone(definition.BaseZoneType, out var baseZone))
             {
-                Mod.log.Warn($"[CustomZoneBuilder] Could not resolve building prefab '{prefabId}' for zone '{newZoneName}' - skipping.");
+                Mod.log.Warn($"[CustomZoneBuilder] No vanilla zone found for base type '{definition.BaseZoneType}' - cannot build '{definition.Name}'.");
+                clonedZone = null;
+                clonedZoneEntity = Entity.Null;
                 return false;
             }
 
-            var clonedBuilding = m_BuildingLinker.CloneBuildingForZone(templateBuilding, clonedZone, $"{newZoneName} - {templateBuilding.name}");
+            clonedZone = m_ZoneCloner.CloneZone(baseZone, internalZoneName);
+            if (clonedZone == null)
+            {
+                Mod.log.Warn($"[CustomZoneBuilder] Failed to clone zone '{baseZone.name}' as '{internalZoneName}' - see PrefabSystem's own log output above for why.");
+                clonedZoneEntity = Entity.Null;
+                return false;
+            }
+
+            if (!m_PrefabSystem.TryGetEntity(clonedZone, out clonedZoneEntity))
+            {
+                Mod.log.Warn($"[CustomZoneBuilder] Cloned zone '{internalZoneName}' has no registered Entity despite AddPrefab succeeding - unexpected.");
+                clonedZone = null;
+                return false;
+            }
+
+            return true;
+        }
+
+        // Returns true only when a NEW clone was made this call, so the
+        // caller can count it - an already-existing building being
+        // re-offered (or re-displayed under a renamed definition) isn't a
+        // new clone.
+        private bool EnsureBuildingCloned(string templatePrefabId, ZonePrefab clonedZone, Game.Zones.ZoneType zoneType, string internalZoneName, string displayZoneName)
+        {
+            var internalBuildingName = GetInternalBuildingName(internalZoneName, templatePrefabId);
+
+            if (m_Catalog.TryGetBuildingPrefab(internalBuildingName, out _, out var existingEntity))
+            {
+                // Already cloned in an earlier build/rebuild. Re-offer it
+                // (a previous rebuild may have retired it if it had
+                // temporarily dropped out of every referenced collection)
+                // and refresh its display name in case the definition was
+                // renamed since.
+                m_EntityManager.SetSharedComponent(existingEntity, new BuildingSpawnGroupData(zoneType));
+                RegisterDisplayName(existingEntity, $"{displayZoneName} - {templatePrefabId}");
+                return false;
+            }
+
+            if (!m_Catalog.TryGetBuildingPrefab(templatePrefabId, out var templateBuilding, out _))
+            {
+                Mod.log.Warn($"[CustomZoneBuilder] Could not resolve building prefab '{templatePrefabId}' for zone '{displayZoneName}' - skipping.");
+                return false;
+            }
+
+            var clonedBuilding = m_BuildingLinker.CloneBuildingForZone(templateBuilding, clonedZone, internalBuildingName);
             if (clonedBuilding == null)
             {
-                Mod.log.Warn($"[CustomZoneBuilder] Failed to clone building '{templateBuilding.name}' for zone '{newZoneName}' - see PrefabSystem's own log output above for why.");
+                Mod.log.Warn($"[CustomZoneBuilder] Failed to clone building '{templateBuilding.name}' for zone '{displayZoneName}' - see PrefabSystem's own log output above for why.");
                 return false;
             }
 
@@ -129,8 +179,32 @@ namespace CS2StyleMod.CustomZones
                 return false;
             }
 
-            RegisterDisplayName(clonedBuildingEntity, $"{newZoneName} - {templateBuilding.name}");
+            RegisterDisplayName(clonedBuildingEntity, $"{displayZoneName} - {templateBuilding.name}");
             return true;
+        }
+
+        // Clears BuildingSpawnGroupData (zone index 0 - never assigned to
+        // any real zone, see ManualPrefabInitializationWorkaround's
+        // history in DECISIONS.md) on every already-cloned building for
+        // this zone that didn't get resolved this round, so it stops
+        // being offered for new construction. Doesn't touch the entity or
+        // anything already built from it.
+        private int RetireBuildingsNoLongerResolved(string internalZoneName, HashSet<string> resolvedPrefabIds)
+        {
+            var namePrefix = GetInternalBuildingNamePrefix(internalZoneName);
+            var retiredCount = 0;
+
+            foreach (var (prefab, entity) in m_Catalog.FindBuildingsByNamePrefix(namePrefix))
+            {
+                var templatePrefabId = prefab.name.Substring(namePrefix.Length);
+                if (resolvedPrefabIds.Contains(templatePrefabId))
+                    continue;
+
+                m_EntityManager.SetSharedComponent(entity, new BuildingSpawnGroupData(default));
+                retiredCount++;
+            }
+
+            return retiredCount;
         }
 
         private void RegisterDisplayName(Entity entity, string displayName)
@@ -138,6 +212,13 @@ namespace CS2StyleMod.CustomZones
             m_PrefabUISystem.GetTitleAndDescription(entity, out var titleId, out _);
             GameManager.instance.localizationManager.AddSource("en-US", new DisplayNameLocaleSource(titleId, displayName));
         }
+
+        private static string GetInternalZoneName(Guid definitionId) => $"{NamePrefix}{definitionId:N}";
+
+        private static string GetInternalBuildingNamePrefix(string internalZoneName) => $"{internalZoneName}.";
+
+        private static string GetInternalBuildingName(string internalZoneName, string templatePrefabId) =>
+            $"{GetInternalBuildingNamePrefix(internalZoneName)}{templatePrefabId}";
 
         private static IEnumerable<CollectionEntry> EnumerateEntries(IEnumerable<Collection> collections)
         {

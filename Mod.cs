@@ -21,6 +21,9 @@ namespace CS2StyleMod
         // the game for mod packages.
         public static ICollectionLibrary CollectionLibrary { get; private set; }
 
+        // Same reasoning as CollectionLibrary above - see DECISIONS.md.
+        public static ICustomZoneDefinitionLibrary CustomZoneDefinitionLibrary { get; private set; }
+
         private Setting m_Setting;
 
         public void OnLoad(UpdateSystem updateSystem)
@@ -33,6 +36,10 @@ namespace CS2StyleMod
             var libraryPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(CS2StyleMod), "collections.json");
             CollectionLibrary = new JsonFileCollectionLibrary(libraryPath);
             log.Info($"Collection library: {libraryPath} ({CollectionLibrary.GetAll().Count} collection(s))");
+
+            var customZonesPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(CS2StyleMod), "customZones.json");
+            CustomZoneDefinitionLibrary = new JsonFileCustomZoneDefinitionLibrary(customZonesPath);
+            log.Info($"Custom zone definition library: {customZonesPath} ({CustomZoneDefinitionLibrary.GetAll().Count} definition(s))");
 
             m_Setting = new Setting(this);
             m_Setting.RegisterInOptionsUI();

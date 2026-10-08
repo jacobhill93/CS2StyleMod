@@ -64,6 +64,52 @@ This is what makes README.md's "editing a collection changes future spawns
 everywhere... no repainting needed" promise hold: the library is the single
 source of truth, saves only ever hold pointers into it.
 
+### A custom zone is itself a persisted, GUID-identified thing (2026-10-08)
+Collections alone weren't enough to satisfy the actual user workflow: "I
+build a zone from a collection today; tomorrow I add newly-downloaded
+Workshop assets to that collection and want the zone to pick them up." A
+`Collection` has no memory of which zone(s) were ever built from it, and a
+built zone is just a cloned prefab with no persisted link back to anything
+- there was nothing to even trigger a re-sync against. `Core.CustomZoneDefinition`
+(Id, Name, a base `Core.ZoneType`, and the `Collection` Id(s) it pulls
+from) closes that gap, persisted the same GUID-keyed way as `Collection`
+(`ICustomZoneDefinitionLibrary`/`JsonFileCustomZoneDefinitionLibrary`, own
+file). Same rename-free principle applies, for a sharper reason than
+Collections: the in-game zone/building prefabs this builds need a name
+that's stable across renames, or a rename would orphan everything already
+built under the old name. `CustomZoneBuilder` derives that internal name
+from `CustomZoneDefinition.Id` (`CS2StyleMod.Zone.<guid>[.<template name>]`),
+never from `Name` - see its own comments.
+
+### Rebuilding a custom zone is additive; removing an asset doesn't touch what's already built
+Requesting the same `CustomZoneDefinition` again (`CustomZoneBuilder.BuildOrRebuild`,
+via `CustomZoneBuildRequestSystem`) finds what was built before by the
+stable internal name above, rather than creating a duplicate or starting
+over. Two cases:
+- **A newly-resolved building that wasn't cloned before** gets cloned now
+  (additive) - this is what makes "add Workshop assets to the collection,
+  then ask for the zone to be rebuilt" work without ever repainting or
+  losing anything already placed.
+- **A building that was cloned before but isn't resolved anymore** (its
+  source entry was removed from every referenced `Collection`) gets its
+  `BuildingSpawnGroupData` cleared (set to zone index 0 - never assigned to
+  any real zone) so it stops being offered for *new* construction. The
+  prefab entity itself is never touched or removed, so any building
+  already standing in the city (which references its own entity directly,
+  not the zone's candidate list) is completely unaffected - it just keeps
+  standing, and the game simply stops building more of that type going
+  forward. Confirmed this is the desired behavior, not an accepted
+  limitation: removing an asset is about curating *future* growth, not
+  retroactively judging what a player already built, and it matches how
+  District Themes already treats collection edits as affecting future
+  spawns only, not existing buildings.
+
+Consciously *not* built: zone deletion, or removing a `CustomZoneDefinition`
+entirely once built. Not needed for the "create/add to" workflow above, and
+removing an entire zone a player has already painted lots with is a much
+bigger question (orphaned lots? forced re-zoning?) worth deferring until
+someone actually needs it.
+
 ### Collection library migration is deferred, but with a real trigger point
 No migration logic for `collections.json`'s `SchemaVersion` exists yet, and
 that's fine for now: `PublishConfiguration.xml` has `AccessLevel="Private"`,
