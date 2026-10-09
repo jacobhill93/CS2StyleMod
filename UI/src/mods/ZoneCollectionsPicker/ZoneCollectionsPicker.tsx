@@ -1,6 +1,10 @@
 import { bindValue, trigger, useValue } from "cs2/api";
 import { Button, Panel, Scrollable } from "cs2/ui";
 import mod from "../../../mod.json";
+import { useDraggable } from "shared/useDraggable";
+import { DraggableHeader } from "shared/DraggableHeader";
+import { useResizable } from "shared/useResizable";
+import { ResizeHandle } from "shared/ResizeHandle";
 
 interface CollectionEntry {
     id: string;
@@ -34,14 +38,17 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
     const zones = useValue(Zones$);
     const zone = zones.find((z) => z.id === zoneId);
     const attachedIds = new Set(zone?.collectionIds ?? []);
+    const { position, onHandleMouseDown: onDragMouseDown } = useDraggable({ x: 480, y: 440 });
+    const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 360, height: 400 });
 
     return (
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
-            header={zone ? `Collections for "${zone.name}"` : "Collections"}
+            header={<DraggableHeader onMouseDown={onDragMouseDown}>{zone ? `Collections for "${zone.name}"` : "Collections"}</DraggableHeader>}
             onClose={onClose}
-            style={{ position: "absolute", top: "440px", left: "480px", width: "360px" }}
+            style={{ width: `${size.width}px`, height: `${size.height}px` }}
         >
-            <Scrollable vertical style={{ maxHeight: "300px" }}>
+            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
                 {collections.length === 0 && <div>No collections yet - create one first.</div>}
                 {collections.map((collection) => {
                     const attached = attachedIds.has(collection.id);
@@ -66,6 +73,8 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
                     );
                 })}
             </Scrollable>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        </div>
     );
 };

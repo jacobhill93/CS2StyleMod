@@ -3,6 +3,10 @@ import { Button, Panel, Scrollable } from "cs2/ui";
 import { useMemo, useState } from "react";
 import mod from "../../../mod.json";
 import { ANY, FilterDropdown } from "shared/FilterDropdown";
+import { useDraggable } from "shared/useDraggable";
+import { DraggableHeader } from "shared/DraggableHeader";
+import { useResizable } from "shared/useResizable";
+import { ResizeHandle } from "shared/ResizeHandle";
 
 interface BuildingEntry {
     prefabId: string;
@@ -51,6 +55,8 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
     const [lotDepthFilter, setLotDepthFilter] = useState(ANY);
     const [assetPackFilter, setAssetPackFilter] = useState(ANY);
     const [targetCollectionId, setTargetCollectionId] = useState(initialTargetCollectionId ?? ANY);
+    const { position, onHandleMouseDown: onDragMouseDown } = useDraggable({ x: 440, y: 100 });
+    const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 480, height: 520 });
 
     const collectionNameById = useMemo(() => {
         const map = new Map<string, string>();
@@ -96,10 +102,11 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
     };
 
     return (
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
-            header={`Buildings (${filtered.length}/${buildings.length})`}
+            header={<DraggableHeader onMouseDown={onDragMouseDown}>{`Buildings (${filtered.length}/${buildings.length})`}</DraggableHeader>}
             onClose={onClose}
-            style={{ position: "absolute", top: "100px", left: "440px", width: "480px" }}
+            style={{ width: `${size.width}px`, height: `${size.height}px` }}
         >
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
                 <input
@@ -125,7 +132,7 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                     formatOption={(id) => collectionNameById.get(id) ?? id}
                 />
             </div>
-            <Scrollable vertical style={{ maxHeight: "360px" }}>
+            <Scrollable vertical style={{ maxHeight: `${size.height - 220}px` }}>
                 {filtered.length === 0 && <div>No buildings match.</div>}
                 {filtered.map((building) => {
                     const alreadyAdded = targetCollectionPrefabIds.has(building.prefabId);
@@ -152,7 +159,9 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                     );
                 })}
             </Scrollable>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        </div>
     );
 };
 

@@ -3,6 +3,10 @@ import { Button, Panel, Scrollable } from "cs2/ui";
 import { useState } from "react";
 import mod from "../../../mod.json";
 import { generateGuid } from "shared/generateGuid";
+import { useDraggable } from "shared/useDraggable";
+import { DraggableHeader } from "shared/DraggableHeader";
+import { useResizable } from "shared/useResizable";
+import { ResizeHandle } from "shared/ResizeHandle";
 
 interface CollectionEntry {
     id: string;
@@ -28,6 +32,8 @@ const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}) => {
     const collections = useValue(Collections$);
     const [newName, setNewName] = useState("");
+    const { position, onHandleMouseDown: onDragMouseDown } = useDraggable({ x: 100, y: 100 });
+    const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 360, height: 400 });
 
     const onCreate = () => {
         const name = newName.trim();
@@ -40,11 +46,12 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
     };
 
     return (
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
-            header="Collections"
-            style={{ position: "absolute", top: "100px", left: "100px", width: "360px" }}
+            header={<DraggableHeader onMouseDown={onDragMouseDown}>Collections</DraggableHeader>}
+            style={{ width: `${size.width}px`, height: `${size.height}px` }}
         >
-            <Scrollable vertical style={{ maxHeight: "300px" }}>
+            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
                 {collections.length === 0 && <div>No collections yet.</div>}
                 {collections.map((collection) => (
                     <div
@@ -72,6 +79,8 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                 />
                 <Button onSelect={onCreate}>Create</Button>
             </div>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        </div>
     );
 };

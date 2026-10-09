@@ -271,6 +271,62 @@ in-game) - worked around by importing the module as a namespace and
 casting that one property (`cs2ui.DropdownItem as unknown as (props:
 ...) => JSX.Element`), not by trying to fix the shipped `.d.ts` itself.
 
+### Draggable Panel abandoned for good - hand-rolled drag instead, like every other third-party CS2 mod (2026-10-08/09)
+Follow-up to the entry below: researched whether `draggable` Panel could
+be made to work (the `PortalContainerProvider` theory) before trying
+again. Verdict, not just a guess: `DraggablePanelProps` is `{
+initialPosition?: Number2 }` and nothing else - no `onDrag`/`onMove`/
+`onPositionChanged` of any kind, confirmed directly from `UI/types/ui.d.ts`.
+It's write-once on mount; a dragged position can never be read back out,
+which would make it useless for this mod's purposes even if the HUD bug
+weren't a factor. Checked three real, shipped third-party CS2 mods that
+register panels via the same `moduleRegistry.append('Game', ...)` pattern
+this mod uses - MeasureItCS2, City Watchdog, HallOfFame - by cloning and
+reading their actual source, not just their descriptions. All three
+independently hand-roll both move and resize with plain `mousedown`/
+`mousemove`/`mouseup` listeners on a positioning wrapper `div` around a
+plain (non-`draggable`) `Panel`, and none references
+`PortalContainerProvider`/`usePortalContainer` anywhere. MeasureItCS2's own
+code comment gives the same "never reports where it ended up" reason for
+rejecting `draggable`.
+
+Implemented the same way: `useDraggable`/`DraggableHeader` (new, alongside
+the existing `useResizable`/`ResizeHandle`) in `UI/src/shared/`, both
+hooked into all four panels. Each panel is now a `position:absolute`
+wrapper `div` (driven by `useDraggable`'s state) around a plain `Panel`
+sized by `useResizable`; dragging starts only from the header strip
+(`DraggableHeader`), not the whole panel, matching all three mods checked
+and ordinary window convention. Not yet confirmed in-game as of this
+writing - next test pass should check both the HUD stays intact (the
+original symptom) and that drag/resize actually work as intended.
+
+### Draggable Panel broke the game's own HUD - reverted, not yet root-caused (2026-10-08)
+Tried making all four panels draggable (`cs2/ui`'s first-party `draggable`/
+`initialPosition` props, confirmed real via `UI/types/ui.d.ts`) and
+resizable (hand-built corner handle, no first-party support exists for
+that). In-game: the game's own bottom ribbon moved to mid-screen
+immediately on load, with no exception in `CS2StyleMod.Mod.log` or
+`UI.log` - a silent layout side effect, not a crash. First fix attempt
+(removing a speculative `position: "relative"` override added alongside
+the resize handle) fixed the ribbon but then our own panels stopped
+rendering at all. Reverted all four panels to the known-good manual
+`style={{position:"absolute", top, left}}` positioning rather than keep
+guessing live while blocking the user's HUD.
+
+**Not actually root-caused** - this is a real open question, not a dead
+end: `ui.d.ts` also declares `Portal`/`usePortalContainer`/
+`PortalContainerProvider`, which the vanilla game likely wraps its own
+draggable panels in somewhere up the tree; `moduleRegistry.append('Game',
+...)` may bypass that entirely, leaving `draggable` Panel without a
+container it expects. Worth testing explicitly (wrap our root component in
+`PortalContainerProvider`) before trying `draggable` again. The shared
+`useResizable`/`ResizeHandle` (`UI/src/shared/`) are left in the tree,
+unused - the resize interaction itself was never actually confirmed broken
+*or* working, since the drag regression blocked testing it at all.
+`MeasureItCS2` (found via the icon-library research agent) has a more
+complete hand-built drag/resize implementation worth reading before a
+second attempt, including a buffered-position pattern to avoid snap-back.
+
 ### A zone's base type is chosen at creation, and fixed afterward (2026-10-08)
 Zone creation originally hardcoded every new zone to `ResidentialLow` (a
 deliberate stopgap, not a decision - "for now they can always show up in

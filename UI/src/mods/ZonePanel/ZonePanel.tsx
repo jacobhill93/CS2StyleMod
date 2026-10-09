@@ -4,6 +4,10 @@ import { useState } from "react";
 import mod from "../../../mod.json";
 import { generateGuid } from "shared/generateGuid";
 import { ANY, FilterDropdown } from "shared/FilterDropdown";
+import { useDraggable } from "shared/useDraggable";
+import { DraggableHeader } from "shared/DraggableHeader";
+import { useResizable } from "shared/useResizable";
+import { ResizeHandle } from "shared/ResizeHandle";
 
 interface ZoneEntry {
     id: string;
@@ -42,6 +46,8 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     const zones = useValue(Zones$);
     const [newName, setNewName] = useState("");
     const [newBaseZoneType, setNewBaseZoneType] = useState(ANY);
+    const { position, onHandleMouseDown: onDragMouseDown } = useDraggable({ x: 100, y: 440 });
+    const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 460, height: 400 });
 
     const onCreate = () => {
         const name = newName.trim();
@@ -55,11 +61,12 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     };
 
     return (
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
-            header="Zones"
-            style={{ position: "absolute", top: "440px", left: "100px", width: "460px" }}
+            header={<DraggableHeader onMouseDown={onDragMouseDown}>Zones</DraggableHeader>}
+            style={{ width: `${size.width}px`, height: `${size.height}px` }}
         >
-            <Scrollable vertical style={{ maxHeight: "300px" }}>
+            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
                 {zones.length === 0 && <div>No zones yet.</div>}
                 {zones.map((zone) => (
                     <div
@@ -90,6 +97,8 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                 <FilterDropdown label="Base type" options={BASE_ZONE_TYPES} value={newBaseZoneType} onChange={setNewBaseZoneType} />
                 <Button disabled={!newName.trim() || newBaseZoneType === ANY} onSelect={onCreate}>Create</Button>
             </div>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        </div>
     );
 };
