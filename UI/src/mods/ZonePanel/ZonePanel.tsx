@@ -46,17 +46,26 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     const zones = useValue(Zones$);
     const [newName, setNewName] = useState("");
     const [newBaseZoneType, setNewBaseZoneType] = useState(ANY);
+    const [createError, setCreateError] = useState(false);
+    // Inline "are you sure?" replacing a row's own Edit/Delete buttons -
+    // same reasoning as CollectionPanel, not cs2/ui's untested
+    // ConfirmationDialog/DialogStack.
+    const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
     const { position, onHandleMouseDown: onDragMouseDown } = useDraggable({ x: 100, y: 440 });
     const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 460, height: 400 });
 
     const onCreate = () => {
         const name = newName.trim();
-        if (!name || newBaseZoneType === ANY) return;
+        if (!name || newBaseZoneType === ANY) {
+            setCreateError(true);
+            return;
+        }
 
         const id = generateGuid();
         trigger(mod.id, "CreateZone", id, name, newBaseZoneType);
         setNewName("");
         setNewBaseZoneType(ANY);
+        setCreateError(false);
         onCreated?.(id, name);
     };
 
@@ -67,35 +76,74 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
             style={{ width: `${size.width}px`, height: `${size.height}px` }}
         >
             <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
-                {zones.length === 0 && <div>No zones yet.</div>}
+                {zones.length === 0 && (
+                    <div style={{ fontSize: "12px", opacity: 0.8 }}>
+                        No zones yet. Create one below and attach collections to define which buildings it offers.
+                    </div>
+                )}
                 {zones.map((zone) => (
                     <div
                         key={zone.id}
                         style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }}
                     >
-                        {/* overflow/textOverflow/minWidth:0 is the standard flexbox
-                            truncation trio - without minWidth:0 a flex item refuses to
-                            shrink below its content width, which is what was pushing
-                            Edit/Delete off the edge of the panel for longer zone names. */}
-                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {zone.name} ({zone.baseZoneType}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
-                        </span>
-                        <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                            <Button onSelect={() => onEdit?.(zone.id, zone.name)}>Edit</Button>
-                            <Button onSelect={() => trigger(mod.id, "DeleteZone", zone.id)}>Delete</Button>
-                        </div>
+                        {confirmingDeleteId === zone.id ? (
+                            <>
+                                <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "12px" }}>
+                                    Delete "{zone.name}"? Its collections remain available for other zones.
+                                </span>
+                                <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                                    <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
+                                    <Button
+                                        onSelect={() => {
+                                            trigger(mod.id, "DeleteZone", zone.id);
+                                            setConfirmingDeleteId(null);
+                                        }}
+                                    >
+                                        Confirm
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* overflow/textOverflow/minWidth:0 is the standard flexbox
+                                    truncation trio - without minWidth:0 a flex item refuses to
+                                    shrink below its content width, which is what was pushing
+                                    Edit/Delete off the edge of the panel for longer zone names. */}
+                                <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {zone.name} ({zone.baseZoneType}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
+                                </span>
+                                <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                                    <Button onSelect={() => onEdit?.(zone.id, zone.name)}>Edit</Button>
+                                    <Button onSelect={() => setConfirmingDeleteId(zone.id)}>Delete</Button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ))}
             </Scrollable>
-            <div style={{ display: "flex", marginTop: "8px", gap: "4px" }}>
-                <input
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    placeholder="New zone name"
-                    style={{ flex: 1 }}
-                />
-                <FilterDropdown label="Base type" options={BASE_ZONE_TYPES} value={newBaseZoneType} onChange={setNewBaseZoneType} />
-                <Button disabled={!newName.trim() || newBaseZoneType === ANY} onSelect={onCreate}>Create</Button>
+            <div style={{ display: "flex", flexDirection: "column", marginTop: "8px", gap: "4px" }}>
+                <div style={{ display: "flex", gap: "4px" }}>
+                    <input
+                        value={newName}
+                        onChange={(event) => {
+                            setNewName(event.target.value);
+                            if (createError) setCreateError(false);
+                        }}
+                        placeholder="New zone name"
+                        style={{ flex: 1 }}
+                    />
+                    <FilterDropdown
+                        label="Base type"
+                        options={BASE_ZONE_TYPES}
+                        value={newBaseZoneType}
+                        onChange={(value) => {
+                            setNewBaseZoneType(value);
+                            if (createError) setCreateError(false);
+                        }}
+                    />
+                    <Button onSelect={onCreate}>Create</Button>
+                </div>
+                {createError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name and base type are both required.</span>}
             </div>
         </Panel>
         <ResizeHandle onMouseDown={onResizeMouseDown} />

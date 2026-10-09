@@ -29,5 +29,15 @@ namespace CS2StyleMod.Core
         {
             m_Entries.Add(entry);
         }
+
+        // Scoped to ExplicitAssetEntry specifically (not a generic Remove)
+        // since that's the only entry kind the building picker adds - a
+        // VanillaSelectorEntry/AdoptedAssetEntry doesn't name one specific
+        // prefab the same way, so "remove this building" doesn't apply to
+        // them the same way.
+        public void RemoveExplicitAsset(string prefabId)
+        {
+            m_Entries.RemoveAll(e => e is ExplicitAssetEntry explicitEntry && explicitEntry.PrefabId == prefabId);
+        }
     }
 }

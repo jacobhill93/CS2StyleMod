@@ -32,16 +32,28 @@ const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}) => {
     const collections = useValue(Collections$);
     const [newName, setNewName] = useState("");
+    const [nameError, setNameError] = useState(false);
+    // Inline "are you sure?" replacing a row's own Edit/Delete buttons,
+    // not cs2/ui's ConfirmationDialog/DialogStack - those are untested in
+    // this codebase, and a hand-rolled confirmation using components
+    // already proven safe here is lower risk than reaching for an unknown
+    // interaction pattern, especially right before a session where no
+    // in-game retest happens until next time.
+    const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
     const { position, onHandleMouseDown: onDragMouseDown } = useDraggable({ x: 100, y: 100 });
     const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 360, height: 400 });
 
     const onCreate = () => {
         const name = newName.trim();
-        if (!name) return;
+        if (!name) {
+            setNameError(true);
+            return;
+        }
 
         const id = generateGuid();
         trigger(mod.id, "CreateCollection", id, name);
         setNewName("");
+        setNameError(false);
         onCreated?.(id, name);
     };
 
@@ -52,32 +64,63 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
             style={{ width: `${size.width}px`, height: `${size.height}px` }}
         >
             <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
-                {collections.length === 0 && <div>No collections yet.</div>}
+                {collections.length === 0 && (
+                    <div style={{ fontSize: "12px", opacity: 0.8 }}>
+                        No collections yet. Create a reusable group of buildings below, then attach it to a zone.
+                    </div>
+                )}
                 {collections.map((collection) => (
                     <div
                         key={collection.id}
                         style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }}
                     >
-                        {/* minWidth:0 is required for a flex item to actually shrink/
-                            truncate instead of pushing the Delete button off-panel. */}
-                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {collection.name} ({collection.entryCount})
-                        </span>
-                        <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                            <Button onSelect={() => onEdit?.(collection.id, collection.name)}>Edit</Button>
-                            <Button onSelect={() => trigger(mod.id, "DeleteCollection", collection.id)}>Delete</Button>
-                        </div>
+                        {confirmingDeleteId === collection.id ? (
+                            <>
+                                <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "12px" }}>
+                                    Delete "{collection.name}"? It will be detached from any zones using it - the buildings in those zones aren't affected.
+                                </span>
+                                <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                                    <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
+                                    <Button
+                                        onSelect={() => {
+                                            trigger(mod.id, "DeleteCollection", collection.id);
+                                            setConfirmingDeleteId(null);
+                                        }}
+                                    >
+                                        Confirm
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* minWidth:0 is required for a flex item to actually shrink/
+                                    truncate instead of pushing the Delete button off-panel. */}
+                                <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {collection.name} ({collection.entryCount})
+                                </span>
+                                <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                                    <Button onSelect={() => onEdit?.(collection.id, collection.name)}>Edit</Button>
+                                    <Button onSelect={() => setConfirmingDeleteId(collection.id)}>Delete</Button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ))}
             </Scrollable>
-            <div style={{ display: "flex", marginTop: "8px", gap: "4px" }}>
-                <input
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    placeholder="New collection name"
-                    style={{ flex: 1 }}
-                />
-                <Button onSelect={onCreate}>Create</Button>
+            <div style={{ display: "flex", flexDirection: "column", marginTop: "8px", gap: "4px" }}>
+                <div style={{ display: "flex", gap: "4px" }}>
+                    <input
+                        value={newName}
+                        onChange={(event) => {
+                            setNewName(event.target.value);
+                            if (nameError) setNameError(false);
+                        }}
+                        placeholder="New collection name"
+                        style={{ flex: 1 }}
+                    />
+                    <Button onSelect={onCreate}>Create</Button>
+                </div>
+                {nameError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name required.</span>}
             </div>
         </Panel>
         <ResizeHandle onMouseDown={onResizeMouseDown} />

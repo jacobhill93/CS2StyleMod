@@ -2,6 +2,45 @@
 
 ## Decisions
 
+### Four UI gaps closed from an external wireframe review (2026-10-09)
+The user had a separate AI review a UI wireframe/spec for a comparable
+"Zone Builder" mod concept and asked for an opinion on what to incorporate.
+Agreed-on low-risk items, implemented this pass:
+- **Delete confirmations** for Zone/Collection (previously instant,
+  irreversible, no warning).
+- **Remove asset from collection** - previously the only way to drop a
+  single building was deleting the whole collection. `Collection` gained
+  `RemoveExplicitAsset(prefabId)`, `CollectionUISystem` gained
+  `RemoveBuildingFromCollection`, and the building picker's per-row button
+  is now a real Add/Remove toggle (was Add-only, with an "Added" status
+  label that did nothing on a second click).
+- **Richer empty states** (explain + action, not a bare one-liner).
+- **Inline validation** on both Create forms (previously silent no-op on
+  empty name/missing base type).
+
+Confirmation dialogs deliberately use a hand-rolled inline pattern (row's
+Edit/Delete replaced by "are you sure?" text + Cancel/Confirm), not
+`cs2/ui`'s `ConfirmationDialog`/`DialogStack`. Reason: two prior incidents
+this session came from unverified assumptions about how a `cs2/ui`
+interaction pattern behaves outside the vanilla game's own usage
+(`<select>` crashed the whole HUD; `draggable` Panel broke the game's own
+ribbon layout) - `ConfirmationDialog`'s own type shape hints it may expect
+being invoked via the `DialogStack` context's `showDialog()`, not rendered
+as ordinary conditional JSX, and that wasn't verified against any working
+example before building on it. The hand-rolled version only uses `Button`
++ conditional rendering, both already proven safe in this exact codebase.
+Worth trying `ConfirmationDialog` properly later if a real example of its
+usage turns up, but not worth the risk right before a session with no
+immediate in-game retest.
+
+The wireframe's bigger structural suggestions (one tabbed window instead
+of four floating panels; modal create/edit dialogs instead of always-
+visible inline forms; batch-select "N selected" asset picker instead of
+one-click-per-row) were deliberately NOT adopted - each is a real,
+debatable tradeoff against what's already built and working, not a clear
+improvement, and not something to decide unilaterally. Revisit only if the
+user wants to reopen that specific question.
+
 ### Build both features, as one mod with per-feature toggles
 - Both share the core (collections, adopted assets, building picker). Two
   mods would mean either duplicating it or a third library mod and

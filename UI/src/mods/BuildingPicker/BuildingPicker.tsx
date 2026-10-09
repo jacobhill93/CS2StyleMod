@@ -133,7 +133,12 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                 />
             </div>
             <Scrollable vertical style={{ maxHeight: `${size.height - 220}px` }}>
-                {filtered.length === 0 && <div>No buildings match.</div>}
+                {filtered.length === 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                        <span style={{ fontSize: "12px", opacity: 0.8 }}>No buildings match. Try a different search or filter.</span>
+                        <Button onSelect={clearFilters}>Clear filters</Button>
+                    </div>
+                )}
                 {filtered.map((building) => {
                     const alreadyAdded = targetCollectionPrefabIds.has(building.prefabId);
                     return (
@@ -151,9 +156,11 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                                 style={{ flexShrink: 0 }}
                                 disabled={targetCollectionId === ANY}
                                 selected={alreadyAdded}
-                                onSelect={() => trigger(mod.id, "AddBuildingToCollection", targetCollectionId, building.prefabId)}
+                                onSelect={() =>
+                                    trigger(mod.id, alreadyAdded ? "RemoveBuildingFromCollection" : "AddBuildingToCollection", targetCollectionId, building.prefabId)
+                                }
                             >
-                                {alreadyAdded ? "Added" : "Add"}
+                                {alreadyAdded ? "Remove" : "Add"}
                             </Button>
                         </div>
                     );

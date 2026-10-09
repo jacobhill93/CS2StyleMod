@@ -46,6 +46,7 @@ namespace CS2StyleMod.UI
             // Collection mutation + the refresh that keeps entryCount
             // current, same reasoning as the other triggers above.
             AddBinding(new TriggerBinding<string, string>(Group, "AddBuildingToCollection", OnAddBuildingToCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            AddBinding(new TriggerBinding<string, string>(Group, "RemoveBuildingFromCollection", OnRemoveBuildingFromCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
         }
 
         private void OnCreateCollection(string id, string name)
@@ -92,6 +93,18 @@ namespace CS2StyleMod.UI
                 return;
 
             collection.Add(new ExplicitAssetEntry(prefabId));
+            Mod.CollectionLibrary.Save(collection);
+            RefreshCollections();
+        }
+
+        private void OnRemoveBuildingFromCollection(string collectionId, string prefabId)
+        {
+            if (!Guid.TryParse(collectionId, out var guid) || string.IsNullOrWhiteSpace(prefabId))
+                return;
+            if (!Mod.CollectionLibrary.TryGet(guid, out var collection))
+                return;
+
+            collection.RemoveExplicitAsset(prefabId);
             Mod.CollectionLibrary.Save(collection);
             RefreshCollections();
         }
