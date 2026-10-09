@@ -207,6 +207,45 @@ Done - see "Decisions" above.
 - Confirm in-game: tab lists/filters the full catalog correctly, no
   accidental way to add/remove anything from it.
 
+### Phase 4c - Asset thumbnails (both Phase 4's picker dialog AND Phase 4b's Assets tab need this)
+
+Raised late (2026-10-09, after the rest of this plan was already written)
+- a real gap: nothing above puts a visual thumbnail next to a building
+row, and a raw `PrefabId` like `CN_ResidentialLow01_L3_2x2` doesn't tell
+a player what the building actually looks like. Needs a research pass
+before implementation, not a guess - two candidate approaches, in
+preference order:
+
+1. **Read the prefab's own icon path directly**, via `GameBuildingCatalog`
+   (C# side). The vanilla zoning/building tool already shows a thumbnail
+   per building, so that data exists on the prefab somewhere - worth
+   checking `Game.Prefabs.UIObject` first (already touched by
+   `ZonePrefabCloner` for "UI category/icon" when cloning a zone, per
+   `TOUCHPOINTS.md`) for an icon path/reference field, the same way every
+   other game API this session was confirmed via reflection before
+   trusting it. If real and accessible, add it to `BuildingBrowserEntry`/
+   `BuildingPickerEntry` (a new field, e.g. `IconPath`) and render it as
+   a plain `<img src=.../>` per row. Strictly the better option if it
+   works: zero dependency, covers vanilla/DLC/Workshop assets uniformly,
+   no coverage gaps.
+2. **Asset Icon Library (AIL)** (github.com/JadHajjar/AssetIconLibrary-
+   CSII, MIT, same author as Find It/Road Builder - already researched
+   this session, see the icon-library research entry in `DECISIONS.md`).
+   Purpose-built for exactly this (~8,000-34,000 per-asset thumbnails),
+   but depends on AIL being installed and its own icon map actually
+   covering the specific assets a player has. Two real integration
+   mechanisms confirmed: `coui://ail/<path>` URLs from `.ail` JSON
+   mapping files, or a `GetIconsMap(string style)` static hook a
+   consuming mod implements on its own `IMod` class that AIL calls
+   reflectively. Fall back to this only if option 1 turns out not to be
+   real/accessible.
+
+Confirm in-game: thumbnails actually render for a representative mix of
+vanilla, DLC, and (if available) Workshop buildings - not just the first
+few rows, since a partial-coverage icon source would need a visible
+fallback (blank/placeholder, not a broken image) for prefabs it can't
+resolve.
+
 ### Phase 5 - Loading, error, and validation states
 
 - None of this exists yet anywhere in the mod (every trigger either
