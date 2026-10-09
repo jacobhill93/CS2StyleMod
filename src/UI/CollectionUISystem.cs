@@ -35,6 +35,12 @@ namespace CS2StyleMod.UI
             AddBinding(new TriggerBinding<string>(Group, "CreateCollection", OnCreateCollection, ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string>(Group, "DeleteCollection", OnDeleteCollection, ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string, string>(Group, "RenameCollection", OnRenameCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+
+            // Called from the building picker (chunk 4), not this panel -
+            // lives here anyway since this system already owns every other
+            // Collection mutation + the refresh that keeps entryCount
+            // current, same reasoning as the other triggers above.
+            AddBinding(new TriggerBinding<string, string>(Group, "AddBuildingToCollection", OnAddBuildingToCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
         }
 
         private void OnCreateCollection(string name)
@@ -63,6 +69,24 @@ namespace CS2StyleMod.UI
                 return;
 
             collection.Name = newName;
+            Mod.CollectionLibrary.Save(collection);
+            RefreshCollections();
+        }
+
+        private void OnAddBuildingToCollection(string collectionId, string prefabId)
+        {
+            if (!Guid.TryParse(collectionId, out var guid) || string.IsNullOrWhiteSpace(prefabId))
+                return;
+            if (!Mod.CollectionLibrary.TryGet(guid, out var collection))
+                return;
+
+            // Idempotent - repeat clicks (or the same building added twice
+            // by mistake) shouldn't balloon the collection with duplicate
+            // entries for the same prefab.
+            if (collection.Entries.OfType<ExplicitAssetEntry>().Any(e => e.PrefabId == prefabId))
+                return;
+
+            collection.Add(new ExplicitAssetEntry(prefabId));
             Mod.CollectionLibrary.Save(collection);
             RefreshCollections();
         }

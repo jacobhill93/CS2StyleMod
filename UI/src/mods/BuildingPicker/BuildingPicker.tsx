@@ -1,4 +1,4 @@
-import { bindValue, useValue } from "cs2/api";
+import { bindValue, trigger, useValue } from "cs2/api";
 import { Button, Dropdown, DropdownToggle, Panel, Scrollable } from "cs2/ui";
 import * as cs2ui from "cs2/ui";
 import { ReactNode, useMemo, useState } from "react";
@@ -29,7 +29,17 @@ interface BuildingEntry {
     assetPackIds: string[];
 }
 
+interface CollectionEntry {
+    id: string;
+    name: string;
+    entryCount: number;
+}
+
 const Buildings$ = bindValue<BuildingEntry[]>(mod.id, "Buildings", []);
+// Same binding CollectionPanel reads - broadcasts aren't exclusive to one
+// panel, and the picker needs to know which collections exist to offer as
+// an "add to" target.
+const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 
 // Empty string means "any" for every filter below.
 const ANY = "";
@@ -77,6 +87,7 @@ const FilterDropdown = ({ label, options, value, onChange, formatOption }: Filte
 // deferred rather than guessed at.
 export const BuildingPicker = () => {
     const buildings = useValue(Buildings$);
+    const collections = useValue(Collections$);
 
     const [nameFilter, setNameFilter] = useState("");
     const [zoneTypeFilter, setZoneTypeFilter] = useState(ANY);
@@ -84,6 +95,13 @@ export const BuildingPicker = () => {
     const [lotWidthFilter, setLotWidthFilter] = useState(ANY);
     const [lotDepthFilter, setLotDepthFilter] = useState(ANY);
     const [assetPackFilter, setAssetPackFilter] = useState(ANY);
+    const [targetCollectionId, setTargetCollectionId] = useState(ANY);
+
+    const collectionNameById = useMemo(() => {
+        const map = new Map<string, string>();
+        collections.forEach((c) => map.set(c.id, c.name));
+        return map;
+    }, [collections]);
 
     const zoneTypes = useMemo(() => distinctStrings(buildings.map((b) => b.zoneType)), [buildings]);
     const levels = useMemo(() => distinctNumbers(buildings.map((b) => b.level)).map(String), [buildings]);
@@ -132,17 +150,33 @@ export const BuildingPicker = () => {
                 <FilterDropdown label="Any pack" options={assetPacks} value={assetPackFilter} onChange={setAssetPackFilter} />
                 <Button onSelect={clearFilters}>Clear</Button>
             </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px" }}>
+                <span style={{ fontSize: "12px" }}>Add to:</span>
+                <FilterDropdown
+                    label="Choose a collection"
+                    options={collections.map((c) => c.id)}
+                    value={targetCollectionId}
+                    onChange={setTargetCollectionId}
+                    formatOption={(id) => collectionNameById.get(id) ?? id}
+                />
+            </div>
             <Scrollable vertical style={{ maxHeight: "360px" }}>
                 {filtered.length === 0 && <div>No buildings match.</div>}
                 {filtered.map((building) => (
                     <div
                         key={building.prefabId}
-                        style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontSize: "12px" }}
+                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", fontSize: "12px", gap: "6px" }}
                     >
                         <span>{building.prefabId}</span>
-                        <span>
+                        <span style={{ flex: "1 1 auto", textAlign: "right" }}>
                             {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]
                         </span>
+                        <Button
+                            disabled={targetCollectionId === ANY}
+                            onSelect={() => trigger(mod.id, "AddBuildingToCollection", targetCollectionId, building.prefabId)}
+                        >
+                            Add
+                        </Button>
                     </div>
                 ))}
             </Scrollable>
