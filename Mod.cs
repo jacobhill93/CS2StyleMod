@@ -57,6 +57,7 @@ namespace CS2StyleMod
 
             // Same phase every UI-binding system in the game uses.
             updateSystem.UpdateAt<CollectionUISystem>(SystemUpdatePhase.UIUpdate);
+            updateSystem.UpdateAt<BuildingPickerUISystem>(SystemUpdatePhase.UIUpdate);
         }
 
         public void OnDispose()

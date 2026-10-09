@@ -215,6 +215,22 @@ field it used to hand-copy (`ObjectGeometryData`, `BuildingData`, `SubMesh`,
 `SubObject`, `BuildingSpawnGroupData`, the `ZoneSystem` zone-registry
 reflection, `UpdateZoneColors()`) is the real systems' job again.
 
+### A UI system's `OnCreate` runs before any prefab exists - query ECS state in `OnGameLoaded` instead (2026-10-08)
+`BuildingPickerUISystem` (the building-picker backend, chunk 2) originally
+called `GameBuildingCatalog.GetAllBuildings()` once in `OnCreate` and bound
+the result directly. In-game, the panel rendered with a header and nothing
+else - no exception anywhere in `CS2StyleMod.Mod.log`, just silently zero
+rows. Root cause: `Game.UI.UISystemBase` derives from `Game.GameSystemBase`
+(confirmed via reflection on `Game.dll`) same as every ordinary game system,
+and `OnCreate` runs at world bootstrap, before `PrefabSystem` has registered
+any prefab - vanilla, DLC, or Paradox Mods pack. Same general timing class as
+"A runtime-cloned prefab is only visible to init systems for one frame"
+above, just the read side instead of the write side: don't assume ECS/prefab
+state exists just because a system's `OnCreate` has run. Fixed by keeping
+`AddBinding` in `OnCreate` (with an empty initial array) but moving the real
+`GetAllBuildings()` snapshot + `ValueBinding.Update(...)` into `OnGameLoaded`
+- confirmed in-game afterward, full list populated correctly.
+
 ### Buffer gaps found via real `Collection` orchestration (2026-10-08, historical)
 Before the timing root cause above was found, the first end-to-end proof
 (one hardcoded building, via the now-deleted workaround) didn't generalize:
