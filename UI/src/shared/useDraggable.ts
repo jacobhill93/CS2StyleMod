@@ -21,17 +21,48 @@ export function useDraggable(initialPosition: Position) {
     const [position, setPosition] = useState(initialPosition);
     const dragRef = useRef<{ startX: number; startY: number; startLeft: number; startTop: number } | null>(null);
 
+    // rAF-batched, not applied straight from the raw mousemove handler -
+    // confirmed in-game (2026-10-09) that a panel with a large list (the
+    // building picker, up to ~4000 rows) stuttered while dragging, because
+    // every raw mousemove (which can fire well over 60/sec) triggered a
+    // full component re-render, re-reconciling the whole list each time.
+    // Capping position updates to once per animation frame, the same
+    // technique City Watchdog's own drag hook uses (found via the earlier
+    // research pass), decouples re-render frequency from mouse-event
+    // frequency.
+    const rafRef = useRef<number | null>(null);
+    const pendingRef = useRef<Position | null>(null);
+
     const onMouseMove = useCallback((event: MouseEvent) => {
         const drag = dragRef.current;
         if (!drag) return;
-        setPosition({
+
+        pendingRef.current = {
             x: drag.startLeft + (event.clientX - drag.startX),
             y: drag.startTop + (event.clientY - drag.startY),
-        });
+        };
+
+        if (rafRef.current === null) {
+            rafRef.current = requestAnimationFrame(() => {
+                rafRef.current = null;
+                if (pendingRef.current) setPosition(pendingRef.current);
+            });
+        }
     }, []);
 
     const onMouseUp = useCallback(() => {
         dragRef.current = null;
+        if (rafRef.current !== null) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+        }
+        // Flush whatever the last pending frame didn't get to apply yet,
+        // so letting go mid-frame doesn't leave the panel one tick behind
+        // where the mouse actually ended up.
+        if (pendingRef.current) {
+            setPosition(pendingRef.current);
+            pendingRef.current = null;
+        }
         window.removeEventListener("mousemove", onMouseMove);
         window.removeEventListener("mouseup", onMouseUp);
     }, [onMouseMove]);
