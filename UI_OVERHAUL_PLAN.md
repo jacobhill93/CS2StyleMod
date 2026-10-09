@@ -75,44 +75,41 @@ by reading `LICENSE` directly):
   name-required validation); loading states and save/delete error
   handling are not built at all yet anywhere in this mod.
 
-## Decisions to lock in before writing code
+## Decisions (locked in 2026-10-09)
 
-These are real forks, not details - pick one explicitly (a one-line
-answer in this file, dated) before Phase 1 starts, so later phases aren't
-built on an assumption that gets reversed halfway through.
-
-1. **Single window, fixed layout (Road Builder-style) vs. keep user
-   drag/resize?** Road Builder's panels are fixed-position, not
-   user-movable. We spent real effort this session building and
-   debugging hand-rolled drag/resize (`useDraggable`/`useResizable`,
-   `UI/src/shared/`) - recommend keeping ONE outer window draggable
-   (reuses that work, low cost, one panel instead of four) but dropping
-   per-panel resize in favor of fixed internal layout once everything's
-   consolidated into one shell, matching Road Builder's actual approach.
-   **Not yet decided.**
-2. **Does "Assets" need its own tab**, or does it only ever appear as the
-   add-to-collection picker dialog? The wireframe shows both a tab (A)
-   and a dialog (E) for assets, which is internally inconsistent with
-   itself. Recommend: no separate Assets tab for v1 (nothing today needs
-   browsing all assets outside the context of adding them to a
-   collection) - just Zones and Collections as the two top-level views,
-   Assets only ever as the picker dialog. **Not yet decided.**
-3. **Asset picker: keep one-click-immediate-add, or switch to the
-   wireframe's batch "N selected → Add (N)"?** We deliberately chose
-   immediate-add earlier this session for lower friction on a repeated
-   action (see `DECISIONS.md`). Recommend keeping it - the wireframe's
-   batch pattern suits a one-time setup flow, ours suits "I'm quickly
-   building a themed collection while half paying attention to the
-   city." **Not yet decided, but leaning keep-current.**
-4. **Create/Edit: modal dialogs (wireframe) or keep today's always-
-   visible inline form?** Inline-create has been low-friction and
-   already works. Recommend: keep inline Create (it's one text field +
-   a button, a modal adds a step for no real benefit), but make Edit a
-   proper modal/detail view **only** if Edit needs to hold more than a
-   rename (e.g. once Zone base-type ever becomes editable, which
-   `DECISIONS.md` currently says it deliberately isn't). For now, Edit
-   stays "open the relevant detail/membership view," not a form modal.
-   **Not yet decided.**
+1. **Fixed position, Road Builder-style - not user-draggable.** The new
+   single window sits at a fixed screen offset per view, like Road
+   Builder's own panels. `useDraggable`/`DraggableHeader` are NOT used on
+   the new shell. (`useResizable`/`ResizeHandle` may still be worth
+   reusing for the asset-picker dialog specifically, if it needs to be
+   resizable independent of the main window - decide in Phase 4, not
+   before.)
+2. **Add a third "Assets" tab.** The tab bar is Zones / Collections /
+   Assets, matching the wireframe literally - a standalone, filterable
+   view of the full building catalog, independent of any collection
+   context. This means the Assets tab's list and the add-to-collection
+   picker dialog (Phase 4) are two different UIs over the same
+   underlying data (`GetAllBuildings()`/the `Buildings` binding) - the
+   tab is browse-only (no "Add to collection" affordance, no target-
+   collection concept), the dialog is picker-only (opened already scoped
+   to one collection). Don't try to merge them into one component; they
+   have different jobs even though they share filters/search.
+3. **Keep one-click-immediate-add, but add Select All / Unselect All.**
+   No batch "N selected → Add (N)" confirm step - adding/removing stays
+   instant per row. Add two new controls (likely in the picker dialog's
+   filter bar, acting on the currently-*filtered* set of rows, not the
+   whole catalog - filtering to one zone/level/pack combo then "Select
+   All" is the obvious use case) that call `AddBuildingToCollection`/
+   `RemoveBuildingFromCollection` once per visible row. Needs a bulk
+   variant: either loop individual trigger calls client-side (simplest,
+   fine for realistic list sizes after filtering) or add a real
+   `AddBuildingsToCollection(collectionId, prefabId[])` trigger
+   server-side if looping triggers turns out to be slow/janky once
+   actually tried - don't build the server-side bulk trigger speculatively,
+   confirm the simple client-side loop is insufficient first.
+4. **Keep inline Create.** Edit stays "open the relevant detail/
+   membership view," not a form modal, unless/until there's more to edit
+   than rename + membership.
 
 ## Phased plan
 
@@ -120,28 +117,31 @@ Each phase should be buildable, testable in-game, and committable on its
 own - same discipline as every chunk this session. Don't start a phase
 until the previous one is confirmed working.
 
-### Phase 0 - Decide the four forks above, write the answers into this file
+### Phase 0 - Decided (2026-10-09)
 
-No code. Just resolve the open questions, dated, so Phase 1 has a stable
-target.
+Done - see "Decisions" above.
 
 ### Phase 1 - Shell + navigation, no feature logic yet
 
 - One new top-level component (e.g. `ShellFeature.tsx`) replacing
   `CollectionsFeature`/`ZonesFeature`'s separate `moduleRegistry.append`
   calls with a single one.
-- One `Panel`, one header ("CS2StyleMod" or similar), a tab bar (Zones /
-  Collections, per decision #2), client-side `useState` for the active
-  tab - no need for a C#-owned mode enum the way Road Builder has one,
-  since our tabs aren't a sequential tool-mode workflow, just two
-  independent lists. Reconsider only if Phase 1 reveals real shared
-  cross-tab state that needs a C# source of truth.
-- Reuse `useDraggable`/`DraggableHeader` on this one outer window per
-  decision #1. Drop `useResizable`/`ResizeHandle` from it if decision #1
-  says fixed layout (keep the files in `UI/src/shared/` regardless -
-  possibly still useful for the asset-picker dialog's own sizing).
-- Empty tab bodies, no list/CRUD logic yet. Confirm in-game: the shell
-  opens, tabs switch, drag still works, nothing else does yet.
+- One `Panel`, fixed `top/left` (or `top/right`) CSS offset, not
+  `useDraggable` - matches decision #1. Check the game's own FPS-meter
+  overlay offset handling in Road Builder's `SidePanel.module.scss`
+  (`&.fpsLevel1/2/3`) before picking a fixed position, so the new window
+  doesn't end up colliding with it the way nothing in this mod has had
+  to consider before.
+- Header, tab bar: Zones / Collections / Assets (decision #2), client-
+  side `useState` for the active tab - no need for a C#-owned mode enum
+  the way Road Builder has one, since our tabs aren't a sequential
+  tool-mode workflow, just three independent views. Reconsider only if
+  a later phase reveals real shared cross-tab state that needs a C#
+  source of truth.
+- Empty tab bodies, no list/CRUD/filter logic yet in any of the three.
+  Confirm in-game: the shell opens at the right fixed position (doesn't
+  overlap the FPS meter or other HUD), tabs switch, nothing else works
+  yet.
 
 ### Phase 2 - Zones tab: list + detail
 
@@ -179,10 +179,33 @@ target.
   of it - zone/level/lot/pack filters, search) as a bounded dialog
   (wireframe section E) opened from a Collection detail's `+ Add Assets`,
   rather than its own always-available floating panel.
-- Apply decision #3 (keep immediate-add, or switch to batch-select).
+- Keep one-click-immediate-add (decision #3) - no batch confirm step.
+- Add **Select All** / **Unselect All**, scoped to the currently
+  *filtered* rows, not the whole catalog. Start with the simplest
+  possible implementation - loop `trigger("AddBuildingToCollection", ...)`
+  /`RemoveBuildingFromCollection` once per visible filtered row,
+  client-side. Only build a real server-side bulk trigger
+  (`AddBuildingsToCollection(collectionId, prefabId[])`) if that loop is
+  actually too slow/janky once tried in-game - don't build it
+  speculatively (decision #3's own note).
+- Decide whether this dialog reuses `useResizable`/`ResizeHandle` for its
+  own sizing (optional per decision #1 - the main shell doesn't use it,
+  this dialog still could).
 - Confirm in-game: opens pre-scoped to the right collection, filters
-  still work, adding reflects immediately in the Collection detail view
-  underneath.
+  still work, Select All/Unselect All only touch the filtered set, adding
+  reflects immediately in the Collection detail view underneath.
+
+### Phase 4b - Assets tab (standalone browse view)
+
+- Decision #2: a real third tab, not just the picker dialog. Reuses the
+  same filter/search machinery and the same `Buildings` binding as the
+  Phase 4 dialog, but browse-only - no target-collection concept, no
+  Add/Remove actions at all. Keep this as a second, simpler consumer of
+  the shared filter logic, not a variant mode bolted onto the picker
+  dialog component itself (different enough jobs - see decision #2's own
+  note - that forcing one component to do both will fight itself).
+- Confirm in-game: tab lists/filters the full catalog correctly, no
+  accidental way to add/remove anything from it.
 
 ### Phase 5 - Loading, error, and validation states
 
