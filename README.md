@@ -52,3 +52,17 @@ rules for which zone types (vanilla or custom) the theme applies to.
 Each feature can be enabled/disabled independently. With Custom Zones
 disabled, the mod creates no zone or building clones, so saves don't
 depend on it.
+
+## Dependencies
+
+None required - the mod works fully on its own. One optional, recommended
+companion:
+
+| Mod | Why | Required? |
+|---|---|---|
+| [Unified Icon Library](https://mods.paradoxplaza.com/mods/74417/Windows) ([source](https://github.com/algernon-A/UnifiedIconLibrary)) | Button icons (Create/Edit/Delete/Add/Remove) across the Collections/Zones UI. Referenced by URL (`coui://uil/...`) at render time, not an API call - if it's not installed, those URLs 404 silently and buttons just show their text label with no icon. | No - purely cosmetic, nothing breaks without it. |
+
+This list is documentation only for now, not yet wired into `UI/mod.json`'s
+own `dependencies` field - its real schema (hard load-blocking requirement
+vs. a soft/recommended entry, and the exact entry format) hasn't been
+confirmed from a real working example yet. See DECISIONS.md.

@@ -2,6 +2,26 @@
 
 ## Decisions
 
+### Started a real mod dependency list - documentation only, mod.json schema still unconfirmed (2026-10-09)
+Added a "Dependencies" section to README.md listing Unified Icon Library
+as optional/recommended (not required - the mod works fully without it,
+icons just don't show). Deliberately did NOT populate `UI/mod.json`'s own
+`dependencies: []` array to match, even though that field exists and looks
+like the obvious place for this: checked two real mods' actual `mod.json`
+(this project's own, and Road Builder's, fetched directly from GitHub) and
+both have `"dependencies": []` despite clear real relationships with other
+systems - no confirmed example of what a *populated* entry looks like, or
+whether it's a hard load-blocking requirement or a soft/recommended one.
+Unified Icon Library's own README gives no guidance either ("install it
+separately, the coui:// URLs just work" - no mod.json wiring mentioned at
+all). Given a wrong guess here risks actual mod-loading behavior (a much
+higher-stakes mistake than a UI bug), left it undeclared in `mod.json`
+rather than guess the schema - the icons already work correctly without
+it (confirmed: a plain runtime URL reference that degrades gracefully).
+Revisit if/when a real example of a populated `dependencies` entry turns
+up (a mod with a genuine hard prerequisite would be the thing to find and
+read).
+
 ### First Unified Icon Library integration pass (2026-10-09)
 Wired real icons (`coui://uil/Standard/<Name>.svg`, confirmed Apache-2.0
 and purely optional - see the earlier icon-library research entry) into
