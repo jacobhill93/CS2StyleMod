@@ -61,7 +61,7 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     };
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>Zones</DraggableHeader>}
             style={{ width: `${size.width}px`, height: `${size.height}px` }}
@@ -97,8 +97,8 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                 <FilterDropdown label="Base type" options={BASE_ZONE_TYPES} value={newBaseZoneType} onChange={setNewBaseZoneType} />
                 <Button disabled={!newName.trim() || newBaseZoneType === ANY} onSelect={onCreate}>Create</Button>
             </div>
-            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };

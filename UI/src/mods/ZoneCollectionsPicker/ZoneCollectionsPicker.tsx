@@ -42,7 +42,7 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
     const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 360, height: 400 });
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>{zone ? `Collections for "${zone.name}"` : "Collections"}</DraggableHeader>}
             onClose={onClose}
@@ -73,8 +73,8 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
                     );
                 })}
             </Scrollable>
-            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };

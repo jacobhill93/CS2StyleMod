@@ -46,7 +46,7 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
     };
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>Collections</DraggableHeader>}
             style={{ width: `${size.width}px`, height: `${size.height}px` }}
@@ -79,8 +79,8 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                 />
                 <Button onSelect={onCreate}>Create</Button>
             </div>
-            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };

@@ -102,7 +102,7 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
     };
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>{`Buildings (${filtered.length}/${buildings.length})`}</DraggableHeader>}
             onClose={onClose}
@@ -159,8 +159,8 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                     );
                 })}
             </Scrollable>
-            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
+        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };
