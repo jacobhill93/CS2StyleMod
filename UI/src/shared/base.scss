@@ -1,0 +1,17 @@
+// Shared SCSS foundation. Compile-time only (plain variables/mixins) -
+// colors deliberately stay out of here and come from the game's own live
+// CSS custom properties instead (var(--panelColorNormal) etc. - confirmed
+// in real use by another CS2 mod's UI, matching the theme interfaces in
+// UI/types/ui.d.ts), so panels keep matching whatever skin/theme the
+// player has selected rather than a hardcoded palette baked in at build
+// time. See DECISIONS.md for why this exists now.
+
+$space-xs: 2px;
+$space-sm: 4px;
+$space-md: 8px;
+$space-lg: 12px;
+$space-xl: 16px;
+
+@mixin interactive-transition($properties: background-color, $duration: 0.15s) {
+    transition: $properties $duration ease;
+}

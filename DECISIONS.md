@@ -271,6 +271,46 @@ in-game) - worked around by importing the module as a namespace and
 casting that one property (`cs2ui.DropdownItem as unknown as (props:
 ...) => JSX.Element`), not by trying to fix the shipped `.d.ts` itself.
 
+### Real CSS (SCSS/CSS Modules) for actual visual polish - the build step already existed, just unused (2026-10-09)
+Researched a real CS2 mod's UI source for design inspiration (not code
+reuse - no license, see "no reuse license" entries elsewhere) before any
+visual polish pass. Finding: genuine polish (hover states, transitions,
+selection animations) is structurally impossible with inline React `style`
+objects - there's no way to express `:hover`/`:active`/`transition`/
+`@keyframes` that way, independent of which component library is used.
+The mod studied ships real `.module.scss` files via webpack + css-loader
+(CSS Modules) + sass-loader + MiniCssExtractPlugin, using plain `transition`,
+`@keyframes`, `backdrop-filter`, and `filter` extensively with no related
+rendering issues - confirming this is safe in cohtml, not just a browser
+assumption.
+
+Turned out `UI/webpack.config.js` already has this *entire* pipeline
+configured (css-loader with `modules: {auto: true}`, sass-loader,
+MiniCssExtractPlugin, a custom `CSSPresencePlugin` that injects a `hasCSS`
+flag into the compiled module so the game knows whether to also load a
+`.css` file) - `sass`/`sass-loader`/`css-loader`/`mini-css-extract-plugin`/
+`classnames` are already real devDependencies too. This was scaffolded by
+the official `@colossalorder/create-csii-ui-mod` tool when the UI project
+was first created, just never used - every panel to date used inline
+`style` objects exclusively. Added the one missing piece (`UI/types/
+scss.d.ts`, a `*.module.scss` module declaration for TypeScript) and
+converted `ResizeHandle` as a deliberately small, isolated proof of concept
+- gave it a real `:hover` state (impossible before), confirmed end-to-end:
+webpack emits a real `CS2StyleMod.css` with correctly scoped class names
+(`.handle_Byk` etc.), it deploys alongside the `.mjs`, and `hasCSS` is
+present in the built output. **Not yet confirmed the hover effect actually
+renders in-game** - next test pass should check that specifically, plus
+that the regular drag/resize interaction still works post-conversion.
+
+Added `UI/src/shared/base.scss` as a small shared foundation (a spacing
+scale, a `@mixin interactive-transition`) for future `.module.scss` files
+to `@use`. Deliberately keeps colors OUT of it - they should come from the
+game's own live CSS custom properties (`var(--panelColorNormal)`,
+`var(--accentColorNormal)`, etc. - matching this repo's own `UI/types/
+ui.d.ts` theme interfaces, and confirmed in real use by the mod studied)
+so panels keep matching whatever skin/theme the player has selected,
+rather than a palette hardcoded at build time.
+
 ### Draggable Panel abandoned for good - hand-rolled drag instead, like every other third-party CS2 mod (2026-10-08/09)
 Follow-up to the entry below: researched whether `draggable` Panel could
 be made to work (the `PortalContainerProvider` theory) before trying

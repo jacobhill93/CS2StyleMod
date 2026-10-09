@@ -1,0 +1,22 @@
+@use "base";
+
+// Proof-of-concept for the SCSS/CSS-Modules pipeline (2026-10-09) - picked
+// this component specifically because it's small and isolated, and because
+// its hover state is literally impossible to express with the inline
+// React `style` objects the rest of this UI still uses (no :hover in
+// inline styles). If this renders and actually highlights on hover
+// in-game, the whole SCSS build step is confirmed working end-to-end.
+.handle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    height: 14px;
+    cursor: nwse-resize;
+    background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%);
+    @include base.interactive-transition(background);
+
+    &:hover {
+        background: linear-gradient(135deg, transparent 50%, var(--accentColorNormal, rgba(255, 255, 255, 0.85)) 50%);
+    }
+}
