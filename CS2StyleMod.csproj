@@ -81,4 +81,12 @@
 		<None Include="$(ModTargetsFile)" Link="Properties\Mod.targets" />
 	</ItemGroup>
 
+	<!--UI/ is its own npm/webpack project (scaffolded via the official
+	    create-csii-ui-mod template) - this just makes `dotnet build` also
+	    run its build, same as every other CS2 UI mod does, so there's
+	    still one build command for the whole mod.-->
+	<Target Name="BuildUI" AfterTargets="AfterBuild">
+		<Exec Command="npm run build" WorkingDirectory="$(ProjectDir)UI" />
+	</Target>
+
 </Project>
