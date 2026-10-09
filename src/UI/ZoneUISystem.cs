@@ -1,7 +1,5 @@
-using Colossal.UI.Binding;
 using CS2StyleMod.Core;
 using CS2StyleMod.CustomZones;
-using Game.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,11 +13,14 @@ namespace CS2StyleMod.UI
     // requirement a build has, see its own comments) so a zone is visible
     // and paintable in-game the moment it's created, and updates live as
     // collections are attached/detached, with no separate "save" step.
-    public partial class ZoneUISystem : UISystemBase
+    //
+    // Built on ExtendedUISystemBase - see CollectionUISystem's comment for
+    // why ZoneUIEntry keeps its own hand-written IJsonWritable.Write()
+    // rather than relying on GenericUIWriter's reflection (camelCase JSON
+    // key preservation).
+    public partial class ZoneUISystem : ExtendedUISystemBase
     {
-        private const string Group = nameof(CS2StyleMod);
-
-        private ValueBinding<ZoneUIEntry[]> m_Zones;
+        private ValueBindingHelper<ZoneUIEntry[]> m_Zones;
         private CustomZoneBuildRequestSystem m_BuildRequestSystem;
 
         protected override void OnCreate()
@@ -28,16 +29,13 @@ namespace CS2StyleMod.UI
 
             m_BuildRequestSystem = World.GetOrCreateSystemManaged<CustomZoneBuildRequestSystem>();
 
-            // Same ValueWriters.Create<T[]>() limitation as CollectionUISystem's
-            // Collections binding - see that class's comment.
-            m_Zones = new ValueBinding<ZoneUIEntry[]>(Group, "Zones", GetEntries(), new ArrayWriter<ZoneUIEntry>(new ZoneUIEntryWriter(), false));
-            AddBinding(m_Zones);
+            m_Zones = CreateBinding("Zones", GetEntries());
 
-            AddBinding(new TriggerBinding<string, string, string>(Group, "CreateZone", OnCreateZone, ValueReaders.Create<string>(), ValueReaders.Create<string>(), ValueReaders.Create<string>()));
-            AddBinding(new TriggerBinding<string>(Group, "DeleteZone", OnDeleteZone, ValueReaders.Create<string>()));
-            AddBinding(new TriggerBinding<string, string>(Group, "RenameZone", OnRenameZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
-            AddBinding(new TriggerBinding<string, string>(Group, "AddCollectionToZone", OnAddCollectionToZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
-            AddBinding(new TriggerBinding<string, string>(Group, "RemoveCollectionFromZone", OnRemoveCollectionFromZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            CreateTrigger<string, string, string>("CreateZone", OnCreateZone);
+            CreateTrigger<string>("DeleteZone", OnDeleteZone);
+            CreateTrigger<string, string>("RenameZone", OnRenameZone);
+            CreateTrigger<string, string>("AddCollectionToZone", OnAddCollectionToZone);
+            CreateTrigger<string, string>("RemoveCollectionFromZone", OnRemoveCollectionFromZone);
         }
 
         private void OnCreateZone(string id, string name, string baseZoneType)
@@ -119,7 +117,7 @@ namespace CS2StyleMod.UI
 
         private void RefreshZones()
         {
-            m_Zones.Update(GetEntries());
+            m_Zones.Value = GetEntries();
         }
 
         private static IEnumerable<Collection> ResolveCollections(CustomZoneDefinition definition)
@@ -140,11 +138,6 @@ namespace CS2StyleMod.UI
                     z.BaseZoneType.ToString(),
                     z.CollectionIds.Select(id => id.ToString()).ToArray()))
                 .ToArray();
-        }
-
-        private sealed class ZoneUIEntryWriter : IWriter<ZoneUIEntry>
-        {
-            public void Write(IJsonWriter writer, ZoneUIEntry value) => value.Write(writer);
         }
     }
 }

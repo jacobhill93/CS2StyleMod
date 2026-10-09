@@ -2,6 +2,72 @@
 
 ## Decisions
 
+### Adapted RoadBuilder's ExtendedUISystemBase (MIT) to cut C# binding boilerplate (2026-10-09)
+A second external-mod research pass (Road Builder, github.com/JadHajjar/
+RoadBuilder-CSII) found and confirmed a genuinely permissive **MIT**
+license (verified by reading the actual `LICENSE` file, not just the
+user's claim) - unlike Find It (no license, all-rights-reserved by
+default) or the other mods checked earlier this session, Road Builder's
+code can actually be adapted directly, with attribution.
+
+Adapted `RoadBuilder/Systems/UI/ExtendedUISystemBase.cs` wholesale into
+`src/UI/ExtendedUISystemBase.cs` (full MIT notice kept at the top of the
+file, per the license's one real requirement). It gives `CreateBinding`/
+`CreateTrigger` helpers that collapse what used to be manual `ValueBinding`
++ `ArrayWriter<T>` + `TriggerBinding` + `ValueReaders.Create<T>()` wiring
+into one call each, via `GenericUIWriter`/`GenericUIReader` (reflection-
+based `IWriter<T>`/`IReader<T>` that serializes any plain object's public
+properties/fields automatically).
+
+Before trusting any of it, verified every API it depends on actually
+exists in this project's own installed game DLLs (not assumed just
+because Road Builder uses it against presumably the same game version):
+`Colossal.Reflection.ReflectionUtils.HasAttribute<T>(this MemberInfo,
+bool)` (real extension method), `Colossal.UI.Binding.GetterValueBinding<T>`
+and `Game.UI.UISystemBase.AddUpdateBinding` (both real), and
+`Colossal.UI.Binding.ValueReaders`'s private static `s_Readers` field
+(which `GenericUIReader` reflects into by exact name - fragile by nature,
+but confirmed present with the expected `Dictionary<Type, object>` shape).
+Also caught and fixed two mistakes introduced while adapting (not bugs in
+the original): `IJsonWriter.ArrayBegin` takes `uint`, not `int` - fixed;
+`IJsonWriter` has no `WriteEmptyArray()` - replaced with `ArrayBegin(0);
+ArrayEnd();`. One revert: briefly "fixed" `IJsonReader.ReadArrayElement`'s
+argument from the original's `(ulong)i` to `(uint)i`, assuming symmetry
+with `ArrayBegin`'s `uint` - reflection on the real `IJsonReader` interface
+confirmed `ReadArrayElement` actually takes `UInt64`, so that was a real
+regression caught before it shipped, not a redundant check.
+
+**Important compatibility decision**: `CollectionUIEntry`/`ZoneUIEntry`/
+`BuildingPickerEntry` deliberately KEPT their own hand-written
+`IJsonWritable.Write()` implementations rather than switching to
+`GenericUIWriter`'s reflection. Reason: reflection writes a plain object's
+public property names verbatim (PascalCase, C# convention, no camelCase
+conversion) - switching would have silently changed the JSON keys every
+TS consumer already expects (`id`/`name`/`entryCount`/`prefabIds` →
+`Id`/`Name`/`EntryCount`/`PrefabIds`), breaking every panel's data binding.
+`GenericUIWriter` checks `obj is IJsonWritable` first and delegates when
+present, so keeping these three DTOs' existing `Write()` methods is what
+keeps the wire format - and every TS file - unchanged while still letting
+`CollectionUISystem`/`ZoneUISystem`/`BuildingPickerUISystem` (all three
+migrated to `ExtendedUISystemBase`) drop their `ArrayWriter<T>`/
+`XEntryWriter` wrapper classes and manual trigger-reader wiring entirely.
+
+One real behavioral change, judged acceptable: `ValueBindingHelper<T>.Value`
+is dirty-tracked, not applied immediately - the actual `Binding.Update()`
+call happens on the next `OnUpdate()` tick (every frame, since these
+systems run `UpdateAt<_>(SystemUpdatePhase.UIUpdate)`), not synchronously
+inside the trigger handler like the old `.Update(...)` calls did. A
+one-frame (~16ms) delay between a mutation and the UI reflecting it is
+imperceptible and matches Road Builder's own shipped, working behavior -
+not treated as a regression.
+
+**Not yet confirmed in-game** - the previous build (hand-written
+`IJsonWritable` + manual bindings, pre-migration) was mid-test when this
+work started; next test pass should confirm Collections/Zones/the
+building picker all still work identically (create/rename/delete/add/
+remove/attach/detach), since the wire format is unchanged but every
+binding's C#-side plumbing was rewritten.
+
 ### Four UI gaps closed from an external wireframe review (2026-10-09)
 The user had a separate AI review a UI wireframe/spec for a comparable
 "Zone Builder" mod concept and asked for an opinion on what to incorporate.

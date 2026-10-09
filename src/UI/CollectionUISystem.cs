@@ -1,52 +1,52 @@
-using Colossal.UI.Binding;
 using CS2StyleMod.Core;
-using Game.UI;
 using System;
 using System.Linq;
 
 namespace CS2StyleMod.UI
 {
     // Exposes Mod.CollectionLibrary to the UI - list, create, rename,
-    // delete. Deliberately minimal first slice: no entry editing yet
-    // (adding/removing buildings within a collection, which needs the
-    // building picker) - just enough to prove the binding pipeline
-    // end-to-end and give the user a real, working piece. Registered
-    // UpdateAt<_>(SystemUpdatePhase.UIUpdate) in Mod.cs, same phase every
-    // other UI-binding system in the game uses.
-    public partial class CollectionUISystem : UISystemBase
+    // delete, and (via the building picker) add/remove buildings.
+    // Registered UpdateAt<_>(SystemUpdatePhase.UIUpdate) in Mod.cs, same
+    // phase every other UI-binding system in the game uses.
+    //
+    // Built on ExtendedUISystemBase (adapted from RoadBuilder, MIT - see
+    // that file's header) instead of raw UISystemBase - CreateBinding/
+    // CreateTrigger replace what used to be manual ValueBinding +
+    // ArrayWriter<T> + TriggerBinding + ValueReaders.Create wiring.
+    // CollectionUIEntry still implements IJsonWritable itself and keeps
+    // doing so deliberately: ExtendedUISystemBase's GenericUIWriter writes
+    // a plain object's PUBLIC PROPERTY NAMES verbatim (PascalCase, no
+    // camelCase conversion) via reflection, which would silently change
+    // the JSON keys this system has always sent (id/name/entryCount/
+    // prefabIds) - but it checks `obj is IJsonWritable` first and
+    // delegates to the object's own Write() when present, so keeping
+    // CollectionUIEntry's hand-written Write() is what keeps the wire
+    // format - and therefore every TS consumer - unchanged.
+    public partial class CollectionUISystem : ExtendedUISystemBase
     {
-        private const string Group = nameof(CS2StyleMod);
-
-        private ValueBinding<CollectionUIEntry[]> m_Collections;
+        private ValueBindingHelper<CollectionUIEntry[]> m_Collections;
 
         protected override void OnCreate()
         {
             base.OnCreate();
 
-            // ValueWriters.Create<T[]>() only works for types with a
-            // pre-registered writer (primitives) - for a custom struct it
-            // reflection-constructs ArrayWriter<T>() with no arguments,
-            // which throws (MissingMethodException, confirmed via an
-            // actual mod-load crash) since its real constructor needs an
-            // explicit element writer. Construct it explicitly instead.
-            m_Collections = new ValueBinding<CollectionUIEntry[]>(Group, "Collections", GetEntries(), new ArrayWriter<CollectionUIEntry>(new CollectionUIEntryWriter(), false));
-            AddBinding(m_Collections);
+            m_Collections = CreateBinding("Collections", GetEntries());
 
             // Takes a client-generated id (chunk 5) rather than letting
             // Collection's own Guid.NewGuid() ctor pick one, so the caller
             // knows which collection was just created without waiting on a
             // round trip through the Collections binding - needed to open
             // the building picker pre-targeted at it immediately.
-            AddBinding(new TriggerBinding<string, string>(Group, "CreateCollection", OnCreateCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
-            AddBinding(new TriggerBinding<string>(Group, "DeleteCollection", OnDeleteCollection, ValueReaders.Create<string>()));
-            AddBinding(new TriggerBinding<string, string>(Group, "RenameCollection", OnRenameCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            CreateTrigger<string, string>("CreateCollection", OnCreateCollection);
+            CreateTrigger<string>("DeleteCollection", OnDeleteCollection);
+            CreateTrigger<string, string>("RenameCollection", OnRenameCollection);
 
             // Called from the building picker (chunk 4), not this panel -
             // lives here anyway since this system already owns every other
             // Collection mutation + the refresh that keeps entryCount
             // current, same reasoning as the other triggers above.
-            AddBinding(new TriggerBinding<string, string>(Group, "AddBuildingToCollection", OnAddBuildingToCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
-            AddBinding(new TriggerBinding<string, string>(Group, "RemoveBuildingFromCollection", OnRemoveBuildingFromCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            CreateTrigger<string, string>("AddBuildingToCollection", OnAddBuildingToCollection);
+            CreateTrigger<string, string>("RemoveBuildingFromCollection", OnRemoveBuildingFromCollection);
         }
 
         private void OnCreateCollection(string id, string name)
@@ -111,7 +111,7 @@ namespace CS2StyleMod.UI
 
         private void RefreshCollections()
         {
-            m_Collections.Update(GetEntries());
+            m_Collections.Value = GetEntries();
         }
 
         private static CollectionUIEntry[] GetEntries()
@@ -123,14 +123,6 @@ namespace CS2StyleMod.UI
                     c.Entries.Count,
                     c.Entries.OfType<ExplicitAssetEntry>().Select(e => e.PrefabId).ToArray()))
                 .ToArray();
-        }
-
-        // Explicit, not auto-resolved - same reasoning as the ArrayWriter
-        // above, kept separate in case CollectionUIEntry ever needs
-        // writing on its own (not just inside an array) elsewhere.
-        private sealed class CollectionUIEntryWriter : IWriter<CollectionUIEntry>
-        {
-            public void Write(IJsonWriter writer, CollectionUIEntry value) => value.Write(writer);
         }
     }
 }

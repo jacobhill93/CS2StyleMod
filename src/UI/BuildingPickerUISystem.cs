@@ -1,8 +1,6 @@
 using Colossal.Serialization.Entities;
-using Colossal.UI.Binding;
 using CS2StyleMod.CustomZones.GameAdapters;
 using Game;
-using Game.UI;
 using System.Linq;
 
 namespace CS2StyleMod.UI
@@ -11,11 +9,14 @@ namespace CS2StyleMod.UI
     // building picker. Bare list only - no search/filter trigger bindings
     // yet, those are planned as client-side filtering in React over this
     // same full list, same approach Find It uses, not a server-side query.
-    public partial class BuildingPickerUISystem : UISystemBase
+    //
+    // Built on ExtendedUISystemBase - see CollectionUISystem's comment for
+    // why BuildingPickerEntry keeps its own hand-written
+    // IJsonWritable.Write() rather than relying on GenericUIWriter's
+    // reflection (camelCase JSON key preservation).
+    public partial class BuildingPickerUISystem : ExtendedUISystemBase
     {
-        private const string Group = nameof(CS2StyleMod);
-
-        private ValueBinding<BuildingPickerEntry[]> m_Buildings;
+        private ValueBindingHelper<BuildingPickerEntry[]> m_Buildings;
 
         protected override void OnCreate()
         {
@@ -30,12 +31,7 @@ namespace CS2StyleMod.UI
             // ECS-dependent system this session - see DECISIONS.md "A
             // runtime-cloned prefab is only visible to init systems for one
             // frame" for the general pattern this is an instance of.
-            //
-            // Same ValueWriters.Create<T[]>() limitation as
-            // CollectionUISystem's Collections binding - see that class's
-            // comment. Explicit ArrayWriter<BuildingPickerEntry> required.
-            m_Buildings = new ValueBinding<BuildingPickerEntry[]>(Group, "Buildings", System.Array.Empty<BuildingPickerEntry>(), new ArrayWriter<BuildingPickerEntry>(new BuildingPickerEntryWriter(), false));
-            AddBinding(m_Buildings);
+            m_Buildings = CreateBinding("Buildings", System.Array.Empty<BuildingPickerEntry>());
         }
 
         protected override void OnGameLoaded(Context context)
@@ -47,12 +43,7 @@ namespace CS2StyleMod.UI
                 .Select(b => new BuildingPickerEntry(b.PrefabId, b.ZoneType.ToString(), b.Level, b.LotSize.Width, b.LotSize.Depth, b.HeightMeters, b.AssetPackIds))
                 .ToArray();
 
-            m_Buildings.Update(entries);
-        }
-
-        private sealed class BuildingPickerEntryWriter : IWriter<BuildingPickerEntry>
-        {
-            public void Write(IJsonWriter writer, BuildingPickerEntry value) => value.Write(writer);
+            m_Buildings.Value = entries;
         }
     }
 }
