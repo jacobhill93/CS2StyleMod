@@ -359,8 +359,46 @@ adapter exists.
       removed?
 - [ ] What do "unzoned" downloaded assets actually contain: buildings
       without spawnable data, plain static objects, or partial growables?
-- [ ] Interaction between themes and the EU/NA theme setting and asset
-      packs.
+- [x] Interaction between themes and the EU/NA theme setting and asset
+      packs. **Resolved (2026-10-08), empirically**: downloaded a real
+      Content Creator Pack (China) and a real community pack (Detroit
+      Bungalow Pack) specifically to test this. Both registered an
+      `AssetPackElement`/`AssetPackPrefab` exactly like the Bridges & Ports
+      DLC already did - this buffer isn't CO-curated-content-only, any
+      named pack (official or community) uses it. Every building with zero
+      `AssetPackElement` entries in that save was plain `NA_`/`EU_` vanilla.
+      So `GameBuildingCatalog.ResolveAssetPackIds` now returns the real
+      `AssetPackPrefab` name when present, falling back to a synthetic
+      `"Vanilla (North America)"`/`"Vanilla (Europe)"` by name prefix, or
+      plain `"Vanilla"` when there's no AssetPackElement and no region
+      prefix - one mechanism covers DLC, official packs, and community
+      packs; the vanilla fallback covers the rest. (First pass of the
+      fallback returned nothing at all when there was no region prefix,
+      which looked fine until actually retested in-game: 1082 buildings -
+      every vanilla Office/Industrial building, e.g. `OfficeLow01_L1_3x4` -
+      have no `NA_`/`EU_` variant at all, so they all fell through empty.
+      Caught by rereading the real dump output, not assumed.)
+      **One known gap, not yet seen**: a single Workshop building released
+      without its own `AssetPackPrefab` (no formal "pack") would fall
+      through to the vanilla-prefix check and, if its name doesn't start
+      with `NA_`/`EU_` either, get zero asset-pack ids rather than being
+      identified as community content. Not fixed since no such asset has
+      been tested yet - revisit if the picker's "no asset pack" bucket ever
+      turns out to contain non-vanilla content.
+      Also checked and discarded as a signal: every building prefab's own
+      `PrefabBase.asset?.GetMeta()` (`Colossal.IO.AssetDatabase.SourceMeta`)
+      exposes `packageName`/`belongsToCurrentUser` - confirmed via live
+      reflection on `Colossal.IO.AssetDatabase.dll` (not in the current
+      Game.dll-only decompile) and confirmed compiling/running in-game, but
+      the real data was inconsistent for this purpose: plenty of plain
+      vanilla buildings had no backing `PrefabAsset` at all (`asset ==
+      null`), others reported `packageName="Prefabs.cok"` with no way to
+      tell that apart from a real pack's own `.cok` name without already
+      knowing the mapping, and `belongsToCurrentUser` was false for every
+      building including the downloaded community pack (it only means "the
+      current Paradox account authored this," not "this was downloaded").
+      `AssetPackElement` is the better-fitting, already-working signal;
+      this mechanism isn't used by the real model.
 - [ ] **Compatibility with other mods**: the Compatibility watchlist above
       is now populated with real, researched candidates (9 mods/lineages,
       sourced from live Paradox Mods data) - but every row is still
@@ -394,3 +432,13 @@ adapter exists.
       `ZoneSpawnSystem`/the Block-Cell subdivision logic in the decompiled
       source before `CandidateFilter` can be trusted for anything but
       single-building-per-lot cases.
+- [ ] **Building picker "size" filter (2026-10-08)**: the full building
+      picker (UI feature, in progress) needs a "building size (low/med/
+      high)" filter alongside zone type, lot width/depth, level, and asset
+      pack. Not yet clarified whether this means the same thing as zone
+      density (`Core.ZoneType`'s Low/Medium/High split, which the picker
+      already filters by separately) or a distinct height/footprint tier
+      (e.g. low-rise vs. high-rise) that could apply *within* one zone
+      category, derived from `ObjectGeometryData.m_Size`/
+      `BuildingData.m_LotSize` rather than stored directly. Deferred by
+      user request - revisit once the rest of the picker is built.

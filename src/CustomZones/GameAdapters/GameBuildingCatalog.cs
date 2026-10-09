@@ -3,7 +3,9 @@ using CS2StyleMod.Core;
 using Game.Buildings;
 using Game.Prefabs;
 using Game.Zones;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Collections;
 using Unity.Entities;
 using CoreZoneType = CS2StyleMod.Core.ZoneType;
@@ -113,6 +115,90 @@ namespace CS2StyleMod.CustomZones.GameAdapters
         public BuildingCandidate Resolve(AdoptedAssetEntry entry)
         {
             return new BuildingCandidate(entry.PrefabId, entry.Settings.Category, entry.Settings.Level, entry.Settings.LotSize);
+        }
+
+        // Not part of IBuildingCatalog - this is richer, pure browse/display
+        // data for the building picker UI, not anything CandidateFilter
+        // needs. Reuses TryDescribeBuilding (same Signature-building
+        // exclusion, same zone-type mapping) rather than duplicating it.
+        public IEnumerable<BuildingBrowserEntry> GetAllBuildings()
+        {
+            var results = new List<BuildingBrowserEntry>();
+            var buildingEntities = m_BuildingQuery.ToEntityArray(Allocator.Temp);
+            try
+            {
+                foreach (var buildingEntity in buildingEntities)
+                {
+                    if (!TryDescribeBuilding(buildingEntity, out var candidate))
+                        continue;
+
+                    var heightMeters = m_EntityManager.TryGetComponent<ObjectGeometryData>(buildingEntity, out var geometry)
+                        ? geometry.m_Size.y
+                        : 0f;
+
+                    results.Add(new BuildingBrowserEntry(
+                        candidate.PrefabId,
+                        candidate.ZoneType,
+                        candidate.Level,
+                        candidate.LotSize,
+                        heightMeters,
+                        ResolveAssetPackIds(buildingEntity, candidate.PrefabId)));
+                }
+            }
+            finally
+            {
+                buildingEntities.Dispose();
+            }
+
+            return results;
+        }
+
+        // A building can belong to more than one asset pack (buffer, not a
+        // single value) - e.g. a regional theme pack plus a DLC pack at
+        // once. Resolves each referenced Game.Prefabs.AssetPackPrefab's own
+        // name, same name-based identity the rest of this catalog already
+        // uses (not PrefabID - see class comment for why).
+        //
+        // Empirically confirmed (2026-10-08, save with Bridges & Ports DLC,
+        // the China Content Creator Pack, and the community-made "Detroit
+        // Bungalow Pack" installed): AssetPackElement/AssetPackPrefab is set
+        // uniformly for all three - DLC, an official Content Creator Pack,
+        // and a community asset pack all register their own AssetPackPrefab,
+        // there's nothing CO-official-only about this buffer. The only
+        // buildings with zero AssetPackElement entries were plain NA_/EU_
+        // vanilla - no orphaned, pack-less community building was found in
+        // that save - so a vanilla fallback split by name prefix is the only
+        // extra case needed today. See DECISIONS.md "Interaction between
+        // themes and the EU/NA theme setting and asset packs" for the one
+        // remaining known gap this doesn't cover (a single Workshop building
+        // released without its own AssetPackPrefab).
+        private string[] ResolveAssetPackIds(Entity buildingEntity, string prefabId)
+        {
+            if (m_EntityManager.TryGetBuffer<AssetPackElement>(buildingEntity, true, out var packs) && packs.Length > 0)
+            {
+                var result = new List<string>(packs.Length);
+                foreach (var pack in packs)
+                {
+                    if (m_PrefabSystem.TryGetPrefab<AssetPackPrefab>(pack.m_Pack, out var packPrefab))
+                        result.Add(packPrefab.name);
+                }
+
+                if (result.Count > 0)
+                    return result.ToArray();
+            }
+
+            // Confirmed in-game (2026-10-08): only Residential/Commercial
+            // vanilla buildings carry a region prefix - Office/Industrial
+            // (e.g. "OfficeLow01_L1_3x4") have no NA_/EU_ variant at all, so
+            // a prefix-only fallback left ~1082 of them with zero pack ids.
+            // Everything without an AssetPackElement is vanilla regardless;
+            // the region split is just a refinement when the prefix exists.
+            if (prefabId.StartsWith("NA_", StringComparison.Ordinal))
+                return new[] { "Vanilla (North America)" };
+            if (prefabId.StartsWith("EU_", StringComparison.Ordinal))
+                return new[] { "Vanilla (Europe)" };
+
+            return new[] { "Vanilla" };
         }
 
         // Not part of IBuildingCatalog. Used by CustomZoneBuilder's rebuild
