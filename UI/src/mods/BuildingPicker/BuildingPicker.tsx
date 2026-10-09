@@ -102,11 +102,11 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
     };
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>{`Buildings (${filtered.length}/${buildings.length})`}</DraggableHeader>}
             onClose={onClose}
-            style={{ width: `${size.width}px`, height: `${size.height}px` }}
+            style={{ width: `${size.width}px` }}
         >
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
                 <input
@@ -132,7 +132,7 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                     formatOption={(id) => collectionNameById.get(id) ?? id}
                 />
             </div>
-            <Scrollable vertical style={{ maxHeight: `${size.height - 220}px` }}>
+            <Scrollable vertical style={{ height: `${size.height - 220}px` }}>
                 {filtered.length === 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                         <span style={{ fontSize: "12px", opacity: 0.8 }}>No buildings match. Try a different search or filter.</span>
@@ -166,8 +166,8 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                     );
                 })}
             </Scrollable>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
-        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };

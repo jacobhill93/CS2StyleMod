@@ -70,12 +70,12 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     };
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>Zones</DraggableHeader>}
-            style={{ width: `${size.width}px`, height: `${size.height}px` }}
+            style={{ width: `${size.width}px` }}
         >
-            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
+            <Scrollable vertical style={{ height: `${size.height - 140}px` }}>
                 {zones.length === 0 && (
                     <div style={{ fontSize: "12px", opacity: 0.8 }}>
                         No zones yet. Create one below and attach collections to define which buildings it offers.
@@ -94,7 +94,7 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                             <>
                                 {/* Stacked, not side-by-side - see CollectionPanel's identical
                                     comment for why. */}
-                                <span style={{ fontSize: "12px" }}>
+                                <span style={{ fontSize: "12px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
                                     Delete "{zone.name}"? Its collections remain available for other zones.
                                 </span>
                                 <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
@@ -151,8 +151,8 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                 </div>
                 {createError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name and base type are both required.</span>}
             </div>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
-        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };

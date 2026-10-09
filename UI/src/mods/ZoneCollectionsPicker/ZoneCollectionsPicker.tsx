@@ -42,13 +42,13 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
     const { size, onHandleMouseDown: onResizeMouseDown } = useResizable({ width: 360, height: 400 });
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>{zone ? `Collections for "${zone.name}"` : "Collections"}</DraggableHeader>}
             onClose={onClose}
-            style={{ width: `${size.width}px`, height: `${size.height}px` }}
+            style={{ width: `${size.width}px` }}
         >
-            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
+            <Scrollable vertical style={{ height: `${size.height - 140}px` }}>
                 {collections.length === 0 && <div>No collections yet - create one first.</div>}
                 {collections.map((collection) => {
                     const attached = attachedIds.has(collection.id);
@@ -73,8 +73,8 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
                     );
                 })}
             </Scrollable>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
-        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };

@@ -58,12 +58,12 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
     };
 
     return (
-        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}>
+        <div style={{ position: "absolute", left: `${position.x}px`, top: `${position.y}px` }}>
         <Panel
             header={<DraggableHeader onMouseDown={onDragMouseDown}>Collections</DraggableHeader>}
-            style={{ width: `${size.width}px`, height: `${size.height}px` }}
+            style={{ width: `${size.width}px` }}
         >
-            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
+            <Scrollable vertical style={{ height: `${size.height - 140}px` }}>
                 {collections.length === 0 && (
                     <div style={{ fontSize: "12px", opacity: 0.8 }}>
                         No collections yet. Create a reusable group of buildings below, then attach it to a zone.
@@ -83,9 +83,12 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                                 {/* Stacked (message, then buttons on their own row) rather than
                                     side-by-side in one flex row - confirmed in-game that a long
                                     message next to fixed-width buttons didn't wrap the way a
-                                    normal browser would, and ended up visually hidden behind them. */}
-                                <span style={{ fontSize: "12px" }}>
-                                    Delete "{collection.name}"? It will be detached from any zones using it - the buildings in those zones aren't affected.
+                                    normal browser would, and ended up visually hidden behind them.
+                                    width:100%/whiteSpace:normal are explicit, not relying on flex
+                                    defaults, since the stacked layout alone wasn't enough - this
+                                    was still clipped instead of wrapping on a second try. */}
+                                <span style={{ fontSize: "12px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
+                                    Delete "{collection.name}"? It'll be detached from any zones using it.
                                 </span>
                                 <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
@@ -130,8 +133,8 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                 </div>
                 {nameError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name required.</span>}
             </div>
+            <ResizeHandle onMouseDown={onResizeMouseDown} />
         </Panel>
-        <ResizeHandle onMouseDown={onResizeMouseDown} />
         </div>
     );
 };
