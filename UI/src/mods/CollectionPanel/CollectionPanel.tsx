@@ -9,16 +9,29 @@ interface CollectionEntry {
     entryCount: number;
 }
 
+interface CollectionPanelProps {
+    // Chunk 5: the building picker needs to know which collection was just
+    // created to open pre-targeted at it, before the next Collections
+    // binding update would otherwise tell it. Generating the id client-side
+    // (rather than waiting on Collection's own Guid.NewGuid()) is what makes
+    // that possible without a round trip.
+    onCreated?: (id: string, name: string) => void;
+}
+
 const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 
-export const CollectionPanel = () => {
+export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
     const collections = useValue(Collections$);
     const [newName, setNewName] = useState("");
 
     const onCreate = () => {
-        if (!newName.trim()) return;
-        trigger(mod.id, "CreateCollection", newName.trim());
+        const name = newName.trim();
+        if (!name) return;
+
+        const id = generateGuid();
+        trigger(mod.id, "CreateCollection", id, name);
         setNewName("");
+        onCreated?.(id, name);
     };
 
     return (
@@ -52,3 +65,17 @@ export const CollectionPanel = () => {
         </Panel>
     );
 };
+
+// RFC4122-ish v4 GUID via Math.random - not cryptographically secure, which
+// is fine here (a collection id isn't a security boundary). Deliberately
+// not crypto.randomUUID(): cohtml's embedded JS runtime hasn't been
+// confirmed to expose the Web Crypto API, and a raw <select> already taught
+// this codebase not to assume a standard browser API just works here
+// without checking (see DECISIONS.md).
+function generateGuid(): string {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}

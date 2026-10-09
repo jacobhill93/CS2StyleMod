@@ -32,7 +32,12 @@ namespace CS2StyleMod.UI
             m_Collections = new ValueBinding<CollectionUIEntry[]>(Group, "Collections", GetEntries(), new ArrayWriter<CollectionUIEntry>(new CollectionUIEntryWriter(), false));
             AddBinding(m_Collections);
 
-            AddBinding(new TriggerBinding<string>(Group, "CreateCollection", OnCreateCollection, ValueReaders.Create<string>()));
+            // Takes a client-generated id (chunk 5) rather than letting
+            // Collection's own Guid.NewGuid() ctor pick one, so the caller
+            // knows which collection was just created without waiting on a
+            // round trip through the Collections binding - needed to open
+            // the building picker pre-targeted at it immediately.
+            AddBinding(new TriggerBinding<string, string>(Group, "CreateCollection", OnCreateCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string>(Group, "DeleteCollection", OnDeleteCollection, ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string, string>(Group, "RenameCollection", OnRenameCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
 
@@ -43,12 +48,12 @@ namespace CS2StyleMod.UI
             AddBinding(new TriggerBinding<string, string>(Group, "AddBuildingToCollection", OnAddBuildingToCollection, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
         }
 
-        private void OnCreateCollection(string name)
+        private void OnCreateCollection(string id, string name)
         {
-            if (string.IsNullOrWhiteSpace(name))
+            if (!Guid.TryParse(id, out var guid) || string.IsNullOrWhiteSpace(name))
                 return;
 
-            Mod.CollectionLibrary.Save(new Collection(name));
+            Mod.CollectionLibrary.Save(new Collection(guid, name));
             RefreshCollections();
         }
 

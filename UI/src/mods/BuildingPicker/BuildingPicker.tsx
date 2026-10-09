@@ -80,12 +80,20 @@ const FilterDropdown = ({ label, options, value, onChange, formatOption }: Filte
     );
 };
 
+interface BuildingPickerProps {
+    // Chunk 5: opened from CollectionPanel's "Create", pre-targeted at the
+    // collection that was just created - the dropdown below still lets the
+    // user retarget to a different existing collection without reopening.
+    initialTargetCollectionId?: string;
+    onClose?: () => void;
+}
+
 // All filtering is client-side over the one full list the backend sends
 // (same approach Find It uses) - no server-side query, no refetch per
 // keystroke. Not included: a "building size (low/med/high)" filter - still
 // an open question (see DECISIONS.md "Building picker 'size' filter"),
 // deferred rather than guessed at.
-export const BuildingPicker = () => {
+export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingPickerProps = {}) => {
     const buildings = useValue(Buildings$);
     const collections = useValue(Collections$);
 
@@ -95,7 +103,7 @@ export const BuildingPicker = () => {
     const [lotWidthFilter, setLotWidthFilter] = useState(ANY);
     const [lotDepthFilter, setLotDepthFilter] = useState(ANY);
     const [assetPackFilter, setAssetPackFilter] = useState(ANY);
-    const [targetCollectionId, setTargetCollectionId] = useState(ANY);
+    const [targetCollectionId, setTargetCollectionId] = useState(initialTargetCollectionId ?? ANY);
 
     const collectionNameById = useMemo(() => {
         const map = new Map<string, string>();
@@ -134,6 +142,7 @@ export const BuildingPicker = () => {
     return (
         <Panel
             header={`Buildings (${filtered.length}/${buildings.length})`}
+            onClose={onClose}
             style={{ position: "absolute", top: "100px", left: "440px", width: "480px" }}
         >
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>

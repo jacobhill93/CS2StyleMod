@@ -1,11 +1,9 @@
 import { ModRegistrar } from "cs2/modding";
-import { CollectionPanel } from "mods/CollectionPanel/CollectionPanel";
-import { BuildingPicker } from "mods/BuildingPicker/BuildingPicker";
+import { CollectionsFeature } from "mods/CollectionsFeature/CollectionsFeature";
 
 const register: ModRegistrar = (moduleRegistry) => {
 
-    moduleRegistry.append('Game', CollectionPanel);
-    moduleRegistry.append('Game', BuildingPicker);
+    moduleRegistry.append('Game', CollectionsFeature);
 }
 
 export default register;
