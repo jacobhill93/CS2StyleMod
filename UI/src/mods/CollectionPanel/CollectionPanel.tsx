@@ -17,11 +17,15 @@ interface CollectionPanelProps {
     // (rather than waiting on Collection's own Guid.NewGuid()) is what makes
     // that possible without a round trip.
     onCreated?: (id: string, name: string) => void;
+    // The only way to reopen the picker for an already-created collection -
+    // without this, Create was a one-time-only chance to add buildings
+    // (same gap ZonePanel's own Edit button already solved for zones).
+    onEdit?: (id: string, name: string) => void;
 }
 
 const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 
-export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
+export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}) => {
     const collections = useValue(Collections$);
     const [newName, setNewName] = useState("");
 
@@ -52,9 +56,10 @@ export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
                         <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {collection.name} ({collection.entryCount})
                         </span>
-                        <Button style={{ flexShrink: 0 }} onSelect={() => trigger(mod.id, "DeleteCollection", collection.id)}>
-                            Delete
-                        </Button>
+                        <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                            <Button onSelect={() => onEdit?.(collection.id, collection.name)}>Edit</Button>
+                            <Button onSelect={() => trigger(mod.id, "DeleteCollection", collection.id)}>Delete</Button>
+                        </div>
                     </div>
                 ))}
             </Scrollable>

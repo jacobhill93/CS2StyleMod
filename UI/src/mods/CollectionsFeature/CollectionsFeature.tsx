@@ -15,7 +15,10 @@ export const CollectionsFeature = () => {
 
     return (
         <>
-            <CollectionPanel onCreated={(id, name) => setPickerTarget({ id, name })} />
+            <CollectionPanel
+                onCreated={(id, name) => setPickerTarget({ id, name })}
+                onEdit={(id, name) => setPickerTarget({ id, name })}
+            />
             {pickerTarget && (
                 // key forces a fresh BuildingPicker per created collection -
                 // filters/target-dropdown reset rather than carrying over
