@@ -87,13 +87,15 @@ by reading `LICENSE` directly):
 2. **Add a third "Assets" tab.** The tab bar is Zones / Collections /
    Assets, matching the wireframe literally - a standalone, filterable
    view of the full building catalog, independent of any collection
-   context. This means the Assets tab's list and the add-to-collection
-   picker dialog (Phase 4) are two different UIs over the same
-   underlying data (`GetAllBuildings()`/the `Buildings` binding) - the
-   tab is browse-only (no "Add to collection" affordance, no target-
-   collection concept), the dialog is picker-only (opened already scoped
-   to one collection). Don't try to merge them into one component; they
-   have different jobs even though they share filters/search.
+   context, browse-only by default (no "Add to collection" affordance).
+   **Revised 2026-10-09**: originally planned as a separate always-
+   browse-only component with its own add-to-collection picker dialog
+   living elsewhere - reversed after the separate dialog's first in-game
+   test hit a real positioning bug (see Phase 4/4b below for the full
+   story). The Assets tab itself now doubles as the picker, gaining
+   Add/Remove/Select-All controls only when entered via a Collection's
+   "+ Add Assets" - still the same two jobs (browse vs. pick), just one
+   component with a mode instead of two.
 3. **Keep one-click-immediate-add, but add Select All / Unselect All.**
    No batch "N selected → Add (N)" confirm step - adding/removing stays
    instant per row. Add two new controls (likely in the picker dialog's
@@ -173,72 +175,100 @@ Done - see "Decisions" above.
 - Confirm in-game: create/select/view membership/remove a single
   asset/delete all work.
 
-### Phase 4 - Asset picker as a proper dialog
+### Phase 4 / 4b - Asset picking, merged into the Assets tab (revised 2026-10-09)
 
-- Restyle `BuildingPicker`'s existing filter/search machinery (keep all
-  of it - zone/level/lot/pack filters, search) as a bounded dialog
-  (wireframe section E) opened from a Collection detail's `+ Add Assets`,
-  rather than its own always-available floating panel.
-- Keep one-click-immediate-add (decision #3) - no batch confirm step.
-- Add **Select All** / **Unselect All**, scoped to the currently
-  *filtered* rows, not the whole catalog. Start with the simplest
-  possible implementation - loop `trigger("AddBuildingToCollection", ...)`
-  /`RemoveBuildingFromCollection` once per visible filtered row,
-  client-side. Only build a real server-side bulk trigger
-  (`AddBuildingsToCollection(collectionId, prefabId[])`) if that loop is
-  actually too slow/janky once tried in-game - don't build it
-  speculatively (decision #3's own note).
-- Decide whether this dialog reuses `useResizable`/`ResizeHandle` for its
-  own sizing (optional per decision #1 - the main shell doesn't use it,
-  this dialog still could).
-- Confirm in-game: opens pre-scoped to the right collection, filters
-  still work, Select All/Unselect All only touch the filtered set, adding
-  reflects immediately in the Collection detail view underneath.
+Originally planned as two separate things - a bounded picker dialog
+(Phase 4, opened from a Collection detail's `+ Add Assets`) and a
+standalone browse-only Assets tab (Phase 4b) - per decision #2's
+reasoning that they have different enough jobs to justify separate
+components. **Built that way first, then merged into one component after
+the first in-game test of the separate dialog surfaced a real bug**: a
+`position:absolute` dialog nested inside the shell's own
+`position:absolute` wrapper resolves against the SHELL's box, not the
+screen, so it rendered on top of/inside the Collections panel instead of
+as a proper overlay. Fixing it meant lifting the dialog out to be a
+sibling of the shell, which also made clear the picker and the browse
+tab only differed by a handful of conditional props (Add/Remove button
+per row, Select All/Unselect All, a header) - not enough to justify a
+second floating panel and its own class of positioning bugs.
 
-### Phase 4b - Assets tab (standalone browse view)
+Current shape: `AssetsTab` takes an optional `pickingForCollectionId` -
+absent when opened from the tab bar (plain browse, decision #2's
+original intent), set by `ShellFeature` when arriving via a Collection's
+`+ Add Assets` (switches the active tab to Assets and shows the
+Add/Remove/Select-All controls, scoped to that collection). A "Done"
+button returns to the Collections tab, reopening the same collection's
+detail view (`ShellFeature` keeps the collection id around across that
+trip and hands it back to `CollectionsTab` as
+`initialSelectedCollectionId`, since tabs unmount on switch and would
+otherwise lose that selection).
 
-- Decision #2: a real third tab, not just the picker dialog. Reuses the
-  same filter/search machinery and the same `Buildings` binding as the
-  Phase 4 dialog, but browse-only - no target-collection concept, no
-  Add/Remove actions at all. Keep this as a second, simpler consumer of
-  the shared filter logic, not a variant mode bolted onto the picker
-  dialog component itself (different enough jobs - see decision #2's own
-  note - that forcing one component to do both will fight itself).
-- Confirm in-game: tab lists/filters the full catalog correctly, no
-  accidental way to add/remove anything from it.
+Kept from the original Phase 4 plan: one-click-immediate-add (decision
+#3, no batch confirm step), Select All/Unselect All scoped to the
+*filtered* rows via a client-side loop of individual trigger calls (only
+worth a real server-side bulk trigger if that loop proves too slow/janky
+in practice - not built speculatively).
+
+Confirm in-game: Assets tab opened directly from the tab bar is
+browse-only (no Add/Remove anywhere); opened via "+ Add Assets" it's
+scoped to the right collection, filters still work, Select All/Unselect
+All only touch the filtered set, adding reflects immediately, and "Done"
+returns to that same collection's detail view.
 
 ### Phase 4c - Asset thumbnails (both Phase 4's picker dialog AND Phase 4b's Assets tab need this)
 
-Raised late (2026-10-09, after the rest of this plan was already written)
-- a real gap: nothing above puts a visual thumbnail next to a building
-row, and a raw `PrefabId` like `CN_ResidentialLow01_L3_2x2` doesn't tell
-a player what the building actually looks like. Needs a research pass
-before implementation, not a guess - two candidate approaches, in
-preference order:
+Raised 2026-10-09 (after the rest of this plan was already written) as a
+real gap: nothing above puts a visual thumbnail next to a building row,
+and a raw `PrefabId` like `CN_ResidentialLow01_L3_2x2` doesn't tell a
+player what the building actually looks like.
 
-1. **Read the prefab's own icon path directly**, via `GameBuildingCatalog`
-   (C# side). The vanilla zoning/building tool already shows a thumbnail
-   per building, so that data exists on the prefab somewhere - worth
-   checking `Game.Prefabs.UIObject` first (already touched by
-   `ZonePrefabCloner` for "UI category/icon" when cloning a zone, per
-   `TOUCHPOINTS.md`) for an icon path/reference field, the same way every
-   other game API this session was confirmed via reflection before
-   trusting it. If real and accessible, add it to `BuildingBrowserEntry`/
-   `BuildingPickerEntry` (a new field, e.g. `IconPath`) and render it as
-   a plain `<img src=.../>` per row. Strictly the better option if it
-   works: zero dependency, covers vanilla/DLC/Workshop assets uniformly,
-   no coverage gaps.
-2. **Asset Icon Library (AIL)** (github.com/JadHajjar/AssetIconLibrary-
+**Research pass done (2026-10-09, via live reflection against the
+installed `Game.dll`, same discipline as every other API claim this
+project makes) - the original preference order was wrong, and reversed:**
+
+- `Game.Prefabs.UIObject.m_Icon` (`string`) is real and confirmed to
+  exist (`ZonePrefabCloner`'s own `m_Group` field is a sibling on the
+  same component). But it's populated with static category/zone-type
+  icons (confirmed: `Content/Game/UI/Media/Game/Icons/Zone*.svg` on
+  disk) - not a per-building render. Even where a building prefab does
+  carry one, it'd be the same icon for every building of that zone type,
+  which doesn't solve "which specific building is this" - the actual
+  problem statement.
+- The real mechanism vanilla uses for per-asset thumbnails is
+  `Game.UI.Thumbnails.ThumbnailCache.GetThumbnail(Object obj, int width,
+  int height, Camera camera)` - a **runtime 3D render** of the actual
+  prefab via a Unity `Camera`, not a static file path. Confirmed via the
+  same reflection pass (full method signature read directly off
+  `Game.dll`). This is a meaningfully bigger lift than "read a field" -
+  it needs a render target, a camera, and a texture handoff into
+  something cohtml's `coui://` scheme can serve, none of which this
+  session has verified end-to-end.
+
+**Revised order:**
+
+1. **Asset Icon Library (AIL)** (github.com/JadHajjar/AssetIconLibrary-
    CSII, MIT, same author as Find It/Road Builder - already researched
-   this session, see the icon-library research entry in `DECISIONS.md`).
-   Purpose-built for exactly this (~8,000-34,000 per-asset thumbnails),
-   but depends on AIL being installed and its own icon map actually
-   covering the specific assets a player has. Two real integration
+   this session, see the icon-library research entry in `DECISIONS.md`)
+   is now the lead option, not the fallback - it already solved the
+   runtime-thumbnail problem (the exact thing `ThumbnailCache` above
+   represents the hard part of) so this mod doesn't have to reimplement
+   Unity Camera-based rendering from scratch. Two real integration
    mechanisms confirmed: `coui://ail/<path>` URLs from `.ail` JSON
    mapping files, or a `GetIconsMap(string style)` static hook a
    consuming mod implements on its own `IMod` class that AIL calls
-   reflectively. Fall back to this only if option 1 turns out not to be
-   real/accessible.
+   reflectively. Depends on AIL being installed and its map actually
+   covering the specific assets a player has - needs a visible
+   placeholder (not a broken image) for prefabs it doesn't cover.
+2. **Render thumbnails ourselves via `ThumbnailCache`** - only worth
+   attempting if AIL's coverage proves too gappy in practice. Real but
+   unverified beyond the method signature: would need its own research
+   pass (how `GetThumbnail`'s `Camera`/`Object` args are actually
+   obtained for a given prefab entity, and how the resulting texture
+   reaches the UI layer) before any implementation attempt - don't guess
+   at this API from a method signature alone.
+3. ~~Read `UIObject.m_Icon` directly~~ - ruled out: real field, wrong
+   data (zone-level icon, not per-building), doesn't solve the actual
+   problem.
 
 Confirm in-game: thumbnails actually render for a representative mix of
 vanilla, DLC, and (if available) Workshop buildings - not just the first
@@ -260,20 +290,49 @@ resolve.
 
 ### Phase 6 - Polish
 
-- Carry forward the icon work already done (icon-only buttons,
-  `tooltipLabel`, Unified Icon Library) into the new shell - should be a
-  near-direct port.
-- Consider `getModule()`-based vanilla theme reuse (Road Builder pattern)
-  for list rows, if the plain `cs2/ui` styling still looks visibly
-  "off" once everything else is working. Treat as optional and
-  lower-confidence (reverse-engineered API, could break on a game
-  update) - verify each specific `getModule()` path against the actual
-  installed game files the same way every other API in this project has
-  been verified this session, don't copy Road Builder's exact calls on
-  faith.
-- Revisit `ConfirmationDialog`/`DialogStack` only if a real working
-  example ever turns up (still unverified) - otherwise keep the
-  hand-rolled confirmation pattern already proven working.
+**First pass done (2026-10-09), not yet confirmed in-game:**
+
+- Icon work was already carried forward during Phases 2-4b (icon-only
+  buttons, `tooltipLabel`, Unified Icon Library) - no separate porting
+  step needed.
+- New `shared/ListRow.module.scss` (`.row`/`.primary`/`.secondary`/
+  `.actions`/`.emptyState`/`.clickable`) replaces the ad hoc inline
+  style objects each tab had grown its own slightly different copy of -
+  applied across Zones/Collections/Assets tabs and their detail views.
+  Adds a subtle hover highlight and a row divider, and moves secondary/
+  metadata text to `var(--textColorDim)` instead of a raw opacity value.
+- `ShellFeature`'s header got a darker sub-background + bottom border
+  separating it from the tab bar, matching Road Builder's real shipped
+  header treatment (`.header`/`.title` in its `SidePanel.module.scss`,
+  fetched and read directly, not copied from memory).
+- Found and removed a real bug while doing this: the shell's `.body`
+  class had carried a blanket `opacity: 0.8` forward from Phase 1, where
+  it was meant to dim the "coming soon" placeholder text - but since it
+  applied to the whole tab body, it was dimming every tab's real content
+  once Phases 2-4b filled them in. Likely a real, measurable contributor
+  to the "looks drab" feedback that kicked this phase off, not just a
+  missing-polish gap.
+- All new tokens (`--panelColorDark`, `--accentColorDark`, `--stroke2`,
+  `--textColorDim`) confirmed real by grepping the actual installed
+  game's compiled stylesheet (`Content/Game/UI/index.css`) for each one
+  - not copied from Road Builder on faith.
+
+**Deliberately not attempted in this pass:**
+
+- `getModule()`-based vanilla theme reuse (Road Builder pattern) for
+  pixel-perfect native list rows - still optional and lower-confidence
+  (reverse-engineered API, could break on a game update). Worth
+  revisiting only if the above still looks visibly "off" once confirmed
+  in-game.
+- `ConfirmationDialog`/`DialogStack` - still unverified, no real working
+  example has turned up. Kept the hand-rolled confirmation pattern,
+  which is proven working.
+
+Confirm in-game: header/tab bar read clearly, list rows show a visible
+hover highlight and aren't all full-opacity-identical anymore, nothing
+regressed (especially the delete-confirmation rows, which intentionally
+don't get the new row styling - their stacked layout is structurally
+different).
 
 ## What NOT to do
 

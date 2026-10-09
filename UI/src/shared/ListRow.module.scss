@@ -1,0 +1,58 @@
+@use "base";
+
+// Phase 6 polish pass (UI_OVERHAUL_PLAN.md) - shared row chrome for every
+// list in the shell (Zones/Collections/Assets tabs and their detail
+// views), replacing the ad hoc inline style objects each tab had grown
+// its own slightly-different copy of. Longhand border/background
+// properties only (border-bottom-style/-width/-color, background-color)
+// - this engine's var() doesn't work in shorthand properties or support
+// a fallback argument at all, confirmed earlier this project
+// (ResizeHandle.module.scss has the full story).
+.row {
+    display: flex;
+    align-items: center;
+    gap: base.$space-sm;
+    padding: base.$space-sm base.$space-xs;
+    border-bottom-style: solid;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    @include base.interactive-transition(background-color);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.06);
+    }
+}
+
+.primary {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.clickable {
+    cursor: pointer;
+}
+
+.secondary {
+    color: var(--textColorDim);
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.actions {
+    display: flex;
+    gap: base.$space-sm;
+    flex-shrink: 0;
+}
+
+.emptyState {
+    font-size: 12px;
+    color: var(--textColorDim);
+    padding: base.$space-sm base.$space-xs;
+}

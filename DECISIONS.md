@@ -2,6 +2,52 @@
 
 ## Decisions
 
+### Phase 4c research: per-building thumbnails are a runtime render, not a static field (2026-10-09)
+UI_OVERHAUL_PLAN.md's Phase 4c had two candidate approaches for asset
+thumbnails, "read the prefab's own icon path" listed as preferred over
+Asset Icon Library (AIL). Checked that assumption via live reflection
+against the actually-installed `Game.dll` (found through
+`CSII_TOOLPATH`/`CSII_MANAGEDPATH`'s real resolution chain in
+`Mod.props`, same env vars the build itself uses - not guessed), using
+`Assembly.ReflectionOnlyLoadFrom` with every DLL in the game's `Managed`
+folder preloaded first (PowerShell/.NET Framework's reflection-only load
+context needs every dependency preloaded or it throws rather than
+resolving lazily).
+
+Findings:
+- `Game.Prefabs.UIObject` is real and does have a `public string m_Icon`
+  field (confirmed alongside the already-used `m_Group` field - same
+  component `ZonePrefabCloner.cs` already touches). But cross-checking
+  against the actual installed game files
+  (`Cities2_Data/Content/Game/UI/Media/Game/Icons/Zone*.svg`) shows this
+  is populated with one icon per zone/category, not one per building -
+  it wouldn't visually distinguish between different buildings of the
+  same zone type, which was the entire point of adding thumbnails.
+- The vanilla building browser's real per-asset thumbnails come from
+  `Game.UI.Thumbnails.ThumbnailCache.GetThumbnail(Object obj, int width,
+  int height, Camera camera)` - a genuine runtime 3D render via a Unity
+  `Camera`, confirmed by reading the actual method signature off
+  `Game.dll`. Meaningfully more involved than a field read: needs a
+  render target/camera and a way to hand the resulting texture to
+  cohtml's `coui://` layer, none of which is verified end-to-end yet.
+  (Also found `Game.UI.GameUIResourceHandler` has a
+  `TryThumbnailRequestAsync` method via its compiler-generated async
+  state machine type, consistent with a thumbnail *request* pipeline
+  existing - not chased further than that, see "what not to do" below.)
+
+Conclusion: flipped Phase 4c's preference order - Asset Icon Library
+(already-solved problem, MIT, same author as Find It/Road Builder) is
+now the lead approach; reading `UIObject.m_Icon` is ruled out (real
+field, wrong data); rendering via `ThumbnailCache` ourselves is now the
+explicit fallback, and would need its own dedicated research pass (not
+a guess from a method signature) if AIL's coverage ever proves
+insufficient. Deliberately stopped short of reverse-engineering the
+exact `coui://` scheme `GameUIResourceHandler`/`ThumbnailCache` use
+internally - not needed to make this decision, and the session's own
+rule for `getModule()`-style reverse-engineered APIs (Road Builder's
+theme reuse, Phase 6) is to only go that deep when something else
+forces the issue.
+
 ### Started a real mod dependency list - documentation only, mod.json schema still unconfirmed (2026-10-09)
 Added a "Dependencies" section to README.md listing Unified Icon Library
 as optional/recommended (not required - the mod works fully without it,

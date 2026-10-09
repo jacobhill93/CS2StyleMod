@@ -1,0 +1,62 @@
+@use "../../shared/base" as base;
+
+// Fixed top/right offset, not draggable - see UI_OVERHAUL_PLAN.md decision
+// #1. Starting values are a guess to be confirmed in-game (not copied
+// verbatim from Road Builder, which uses a "rem" unit tuned to its own
+// panel; this codebase's other panels all use plain px - see
+// ResizeHandle.module.scss) - the fpsLevel step-up amounts mirror Road
+// Builder's relative proportions as a starting point, not final numbers.
+.shell {
+    position: absolute;
+    top: 60px;
+    right: 10px;
+    width: 420px;
+
+    &.fpsLevel1 {
+        top: 80px;
+    }
+
+    &.fpsLevel2 {
+        top: 150px;
+    }
+
+    &.fpsLevel3 {
+        top: 160px;
+    }
+}
+
+// Phase 6 polish - darker sub-background + bottom border separating the
+// title from the tab bar below it, matching Road Builder's real shipped
+// header treatment (.header/.title in its SidePanel.module.scss, fetched
+// and read directly - see DECISIONS.md). Tokens confirmed real by
+// grepping the actual installed game's compiled stylesheet
+// (Content/Game/UI/index.css), not guessed.
+.header {
+    background-color: var(--panelColorDark);
+    padding: base.$space-sm base.$space-md;
+    border-bottom-style: solid;
+    border-bottom-width: var(--stroke2);
+    border-bottom-color: var(--accentColorDark);
+    font-size: 14px;
+    text-transform: uppercase;
+    color: var(--accentColorNormal);
+}
+
+.tabs {
+    display: flex;
+    gap: base.$space-sm;
+    margin-bottom: base.$space-md;
+    padding: base.$space-sm base.$space-md 0;
+}
+
+// Phase 6: dropped the blanket opacity:0.8 this had in Phase 1 - that
+// was only ever meant to dim the "coming soon" placeholder text, but
+// since it applied to the whole body it was dimming every tab's real
+// content (list rows, inputs, everything) once Phases 2-4b filled them
+// in - a likely real contributor to the "drab" look, not just a missing-
+// polish gap.
+.body {
+    min-height: 240px;
+    font-size: 12px;
+    padding: 0 base.$space-md base.$space-md;
+}
