@@ -1,11 +1,17 @@
 @use "base";
 
-// Proof-of-concept for the SCSS/CSS-Modules pipeline (2026-10-09) - picked
-// this component specifically because it's small and isolated, and because
-// its hover state is literally impossible to express with the inline
-// React `style` objects the rest of this UI still uses (no :hover in
-// inline styles). If this renders and actually highlights on hover
-// in-game, the whole SCSS build step is confirmed working end-to-end.
+// Proof-of-concept for the SCSS/CSS-Modules pipeline (2026-10-09). The CSS
+// genuinely does load at runtime (confirmed via the game's own loader
+// code and UI.log - see DECISIONS.md "SCSS pipeline root-caused") - the
+// first attempt's :hover rule just silently failed to parse, for a real,
+// vendor-documented cohtml/Gameface engine limitation: CSS custom
+// properties (var()) only work in LONGHAND properties, never shorthand
+// (background/border/transition/padding etc. all fail; background-image/
+// border-color/etc. work), and var()'s fallback argument (the second
+// value) isn't supported AT ALL. The original rule hit both at once
+// (`background: ... var(--x, fallback) ...`). Fixed by using the longhand
+// background-image and dropping the fallback - --accentColorNormal is
+// always defined globally by the game, so no fallback is needed anyway.
 .handle {
     position: absolute;
     right: 0;
@@ -13,10 +19,10 @@
     width: 14px;
     height: 14px;
     cursor: nwse-resize;
-    background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%);
-    @include base.interactive-transition(background);
+    background-image: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%);
+    @include base.interactive-transition(background-image);
 
     &:hover {
-        background: linear-gradient(135deg, transparent 50%, var(--accentColorNormal, rgba(255, 255, 255, 0.85)) 50%);
+        background-image: linear-gradient(135deg, transparent 50%, var(--accentColorNormal) 50%);
     }
 }

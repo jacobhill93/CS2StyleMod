@@ -300,23 +300,41 @@ BUILD level: webpack emits a real `CS2StyleMod.css` with correctly scoped
 class names (`.handle_Byk` etc.), it deploys alongside the `.mjs`, and
 `hasCSS` is present in the built output.
 
-**In-game result (2026-10-09): the handle was invisible/unfindable** - no
-JS exception logged anywhere, consistent with the stylesheet building
-correctly but never actually being loaded by the running game, not with
-any error. The build-time half of this mechanism is confirmed; the
-runtime-loading half (does the game actually read `hasCSS` and fetch the
-sibling `.css`, and if so from where/how) is NOT confirmed and was
-wrongly treated as settled - that was a real gap, caught by testing
-rather than by review. Reverted `ResizeHandle` back to inline styles (the
-known-working version) rather than leave it broken. `base.scss`/
-`ResizeHandle.module.scss`/`UI/types/scss.d.ts` are left in the tree,
-unused - don't build further styling on this pipeline until the runtime-
-loading question is actually answered (check the official
-`@colossalorder/create-csii-ui-mod` toolchain's own example/template
-output for a working reference, since it ships the config deliberately;
-or find a real third-party mod that ships a `.module.scss` and confirm
-its CSS actually visibly applies in-game, the same way MeasureItCS2/City
-Watchdog/HallOfFame were checked for the drag/resize question).
+**In-game result (2026-10-09): the handle was invisible/unfindable**, no
+JS exception logged anywhere. First guess - that the stylesheet was never
+actually loaded at runtime - was wrong, caught by a dedicated research
+pass before building further on the wrong theory. Reverted `ResizeHandle`
+to inline styles (the known-working version) as a stopgap while that
+research ran.
+
+**Actual root cause, confirmed from the game's own loader source and
+`UI.log`, not guessed**: the CSS genuinely loads. The game's compiled UI
+bundle (`Cities2_Data/Content/Game/UI/index.js`) reads the `hasCSS` flag,
+replaces `.mjs`→`.css` in the same URL, and injects a `<link
+rel="stylesheet">` - exactly the convention this mod's webpack output
+already follows (confirmed identical, byte-for-byte, to a real installed
+mod's deployed output, Find It's `FindIt.mjs`/`FindIt.css`). `UI.log`
+itself proved the file loaded: it logged a parse warning quoting our
+*exact* `:hover` rule back verbatim ("Custom CSS expressions are not
+supported in shorthand declaration... background -
+linear-gradient(...var(--accentColorNormal,rgba(...))...)"). The real bug
+is a vendor-documented cohtml/Gameface engine limitation: CSS custom
+properties (`var()`) only work in **longhand** properties
+(`background-image`, `border-color`, etc.), never shorthand (`background`,
+`border`, `transition`, `padding`...), and `var()`'s fallback argument
+(the second value) isn't supported **at all**. The rule hit both at once.
+Fixed by switching to `background-image` and dropping the fallback
+(`--accentColorNormal` is always defined globally by the game, so no
+fallback was needed anyway) - re-enabled `ResizeHandle`'s `.module.scss`
+version with the fix, confirmed at the build level (deployed CSS now
+reads `background-image:...` with a bare `var(--accentColorNormal)`, no
+fallback). **Not yet re-confirmed in-game** - next test pass should
+check the hover effect actually renders now.
+
+**Lesson for any future `.module.scss` work in this codebase**: never use
+`var()` inside a shorthand property, and never pass a `var()` fallback
+argument - cohtml/Gameface silently drops the whole declaration if you do,
+with only a log warning (not a build error) to find it by.
 
 Added `UI/src/shared/base.scss` as a small shared foundation (a spacing
 scale, a `@mixin interactive-transition`) for future `.module.scss` files
