@@ -18,6 +18,7 @@ interface CollectionEntry {
     id: string;
     name: string;
     entryCount: number;
+    prefabIds: string[];
 }
 
 const Buildings$ = bindValue<BuildingEntry[]>(mod.id, "Buildings", []);
@@ -56,6 +57,15 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
         collections.forEach((c) => map.set(c.id, c.name));
         return map;
     }, [collections]);
+
+    // Real state, not a transient "just clicked" flag - reflects whether
+    // the building is actually in the targeted collection right now, so it
+    // stays correct across retargeting, filtering, and reopening the
+    // picker later, not just immediately after a click.
+    const targetCollectionPrefabIds = useMemo(() => {
+        const target = collections.find((c) => c.id === targetCollectionId);
+        return new Set(target?.prefabIds ?? []);
+    }, [collections, targetCollectionId]);
 
     const zoneTypes = useMemo(() => distinctStrings(buildings.map((b) => b.zoneType)), [buildings]);
     const levels = useMemo(() => distinctNumbers(buildings.map((b) => b.level)).map(String), [buildings]);
@@ -117,26 +127,30 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
             </div>
             <Scrollable vertical style={{ maxHeight: "360px" }}>
                 {filtered.length === 0 && <div>No buildings match.</div>}
-                {filtered.map((building) => (
-                    <div
-                        key={building.prefabId}
-                        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "2px 0", fontSize: "12px" }}
-                    >
-                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {building.prefabId}
-                        </span>
-                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>
-                            {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]
-                        </span>
-                        <Button
-                            style={{ flexShrink: 0 }}
-                            disabled={targetCollectionId === ANY}
-                            onSelect={() => trigger(mod.id, "AddBuildingToCollection", targetCollectionId, building.prefabId)}
+                {filtered.map((building) => {
+                    const alreadyAdded = targetCollectionPrefabIds.has(building.prefabId);
+                    return (
+                        <div
+                            key={building.prefabId}
+                            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "2px 0", fontSize: "12px" }}
                         >
-                            Add
-                        </Button>
-                    </div>
-                ))}
+                            <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {building.prefabId}
+                            </span>
+                            <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>
+                                {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]
+                            </span>
+                            <Button
+                                style={{ flexShrink: 0 }}
+                                disabled={targetCollectionId === ANY}
+                                selected={alreadyAdded}
+                                onSelect={() => trigger(mod.id, "AddBuildingToCollection", targetCollectionId, building.prefabId)}
+                            >
+                                {alreadyAdded ? "Added" : "Add"}
+                            </Button>
+                        </div>
+                    );
+                })}
             </Scrollable>
         </Panel>
     );

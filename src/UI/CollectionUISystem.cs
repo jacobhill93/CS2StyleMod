@@ -104,7 +104,11 @@ namespace CS2StyleMod.UI
         private static CollectionUIEntry[] GetEntries()
         {
             return Mod.CollectionLibrary.GetAll()
-                .Select(c => new CollectionUIEntry(c.Id.ToString(), c.Name, c.Entries.Count))
+                .Select(c => new CollectionUIEntry(
+                    c.Id.ToString(),
+                    c.Name,
+                    c.Entries.Count,
+                    c.Entries.OfType<ExplicitAssetEntry>().Select(e => e.PrefabId).ToArray()))
                 .ToArray();
         }
 
