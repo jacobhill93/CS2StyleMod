@@ -271,6 +271,44 @@ in-game) - worked around by importing the module as a namespace and
 casting that one property (`cs2ui.DropdownItem as unknown as (props:
 ...) => JSX.Element`), not by trying to fix the shipped `.d.ts` itself.
 
+### A collection's buildings aren't filtered by the zone's base type (found and fixed 2026-10-08)
+Found via real in-game testing, not guessed: a "Main Zone" (`BaseZoneType =
+ResidentialLow`) with two attached collections spawned a
+`CN_BonusResidentialMedium01` building, and painting it drew down Low
+demand while Medium-density buildings came out of the ground. Root-caused
+by reading the actual persisted data (`customZones.json`/`collections.json`
+on disk, not just the summary log line) rather than assuming: the two
+attached collections held mostly non-Low buildings (one
+`ResidentialMedium`, several `Office`, several `NA_MixedLeft01` mixed-use)
+and exactly one real `ResidentialLow` building. `CustomZoneBuilder` was
+cloning and offering *every* resolved entry regardless of whether its own
+`ZoneType` matched the zone's `BaseZoneType` - nothing ever checked this,
+because `Collection` is a deliberately zone-type-agnostic bag (see "Use
+collections as the shared abstraction" above) and the building picker that
+adds entries to one has no reason to know which zone(s) it'll end up
+feeding. Fixed by checking `candidate.ZoneType != definition.BaseZoneType`
+in `BuildOrRebuild` for both entry kinds - silently excluded for
+`VanillaSelectorEntry` (a selector can resolve many candidates; mismatches
+there are the expected common case for a collection shared across
+zones of different types), warned about for `ExplicitAssetEntry` (a direct,
+one-off user pick, not a broad filter). Already-cloned mismatched buildings
+retire automatically on the next rebuild of that zone (same additive
+rebuild/retire mechanism as removing an asset - see "Rebuilding a custom
+zone is additive" above), not immediately - the user needs to trigger any
+rebuild (attach/detach a collection, or rename) to see it take effect on a
+zone that existed before this fix.
+
+**This did not fully explain the "same building every time" observation**:
+after this fix, "Main Zone" still has exactly one real `ResidentialLow`
+candidate across both its attached collections, so it'll keep offering
+that same single building until the user adds more Low-density buildings
+to a collection feeding it - this is now understood to be a data/content
+gap in the test collections, not a randomness bug in the game's own
+building-selection logic, but that reasoning hasn't been independently
+confirmed by reading `ZoneSpawnSystem.SelectBuilding`'s own code - revisit
+if a zone with multiple same-type, same-level, same-lot-size candidates
+still only ever offers one.
+
 ### Buffer gaps found via real `Collection` orchestration (2026-10-08, historical)
 Before the timing root cause above was found, the first end-to-end proof
 (one hardcoded building, via the now-deleted workaround) didn't generalize:

@@ -1,0 +1,143 @@
+using Colossal.UI.Binding;
+using CS2StyleMod.Core;
+using CS2StyleMod.CustomZones;
+using Game.UI;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace CS2StyleMod.UI
+{
+    // Exposes Mod.CustomZoneDefinitionLibrary to the UI - list, create,
+    // rename, delete, and attach/detach Collections. Every mutation here
+    // saves AND immediately enqueues a CustomZoneBuildRequestSystem.Request
+    // (never builds directly itself - that system owns the one timing
+    // requirement a build has, see its own comments) so a zone is visible
+    // and paintable in-game the moment it's created, and updates live as
+    // collections are attached/detached, with no separate "save" step.
+    public partial class ZoneUISystem : UISystemBase
+    {
+        private const string Group = nameof(CS2StyleMod);
+
+        private ValueBinding<ZoneUIEntry[]> m_Zones;
+        private CustomZoneBuildRequestSystem m_BuildRequestSystem;
+
+        protected override void OnCreate()
+        {
+            base.OnCreate();
+
+            m_BuildRequestSystem = World.GetOrCreateSystemManaged<CustomZoneBuildRequestSystem>();
+
+            // Same ValueWriters.Create<T[]>() limitation as CollectionUISystem's
+            // Collections binding - see that class's comment.
+            m_Zones = new ValueBinding<ZoneUIEntry[]>(Group, "Zones", GetEntries(), new ArrayWriter<ZoneUIEntry>(new ZoneUIEntryWriter(), false));
+            AddBinding(m_Zones);
+
+            AddBinding(new TriggerBinding<string, string>(Group, "CreateZone", OnCreateZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            AddBinding(new TriggerBinding<string>(Group, "DeleteZone", OnDeleteZone, ValueReaders.Create<string>()));
+            AddBinding(new TriggerBinding<string, string>(Group, "RenameZone", OnRenameZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            AddBinding(new TriggerBinding<string, string>(Group, "AddCollectionToZone", OnAddCollectionToZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            AddBinding(new TriggerBinding<string, string>(Group, "RemoveCollectionFromZone", OnRemoveCollectionFromZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+        }
+
+        private void OnCreateZone(string id, string name)
+        {
+            if (!Guid.TryParse(id, out var guid) || string.IsNullOrWhiteSpace(name))
+                return;
+
+            // Every custom zone defaults to ResidentialLow for now - which
+            // top-level category (or categories) a zone should be offered
+            // under is a real open question (see DECISIONS.md), deferred
+            // rather than guessed at. Built immediately with zero
+            // collections so the zone shell exists and is paintable right
+            // away, before any building is attached.
+            var definition = new CustomZoneDefinition(guid, name, ZoneType.ResidentialLow);
+            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            m_BuildRequestSystem.Request(definition, Enumerable.Empty<Collection>());
+            RefreshZones();
+        }
+
+        private void OnDeleteZone(string id)
+        {
+            if (!Guid.TryParse(id, out var guid))
+                return;
+
+            // Deleting the definition doesn't retract what's already built
+            // in-game - same "removing doesn't touch what's already built"
+            // philosophy as retiring a building, see DECISIONS.md. A
+            // zone/buildings already painted with stay as they are.
+            Mod.CustomZoneDefinitionLibrary.Delete(guid);
+            RefreshZones();
+        }
+
+        private void OnRenameZone(string id, string newName)
+        {
+            if (!Guid.TryParse(id, out var guid) || string.IsNullOrWhiteSpace(newName))
+                return;
+            if (!Mod.CustomZoneDefinitionLibrary.TryGet(guid, out var definition))
+                return;
+
+            definition.Name = newName;
+            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            // Rebuild so the in-game display name (CustomZoneBuilder.RegisterDisplayName) picks up the rename too.
+            m_BuildRequestSystem.Request(definition, ResolveCollections(definition));
+            RefreshZones();
+        }
+
+        private void OnAddCollectionToZone(string zoneId, string collectionId)
+        {
+            if (!Guid.TryParse(zoneId, out var zoneGuid) || !Guid.TryParse(collectionId, out var collectionGuid))
+                return;
+            if (!Mod.CustomZoneDefinitionLibrary.TryGet(zoneGuid, out var definition))
+                return;
+
+            definition.AddCollection(collectionGuid);
+            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            m_BuildRequestSystem.Request(definition, ResolveCollections(definition));
+            RefreshZones();
+        }
+
+        private void OnRemoveCollectionFromZone(string zoneId, string collectionId)
+        {
+            if (!Guid.TryParse(zoneId, out var zoneGuid) || !Guid.TryParse(collectionId, out var collectionGuid))
+                return;
+            if (!Mod.CustomZoneDefinitionLibrary.TryGet(zoneGuid, out var definition))
+                return;
+
+            definition.RemoveCollection(collectionGuid);
+            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            m_BuildRequestSystem.Request(definition, ResolveCollections(definition));
+            RefreshZones();
+        }
+
+        private void RefreshZones()
+        {
+            m_Zones.Update(GetEntries());
+        }
+
+        private static IEnumerable<Collection> ResolveCollections(CustomZoneDefinition definition)
+        {
+            foreach (var collectionId in definition.CollectionIds)
+            {
+                if (Mod.CollectionLibrary.TryGet(collectionId, out var collection))
+                    yield return collection;
+            }
+        }
+
+        private static ZoneUIEntry[] GetEntries()
+        {
+            return Mod.CustomZoneDefinitionLibrary.GetAll()
+                .Select(z => new ZoneUIEntry(
+                    z.Id.ToString(),
+                    z.Name,
+                    z.BaseZoneType.ToString(),
+                    z.CollectionIds.Select(id => id.ToString()).ToArray()))
+                .ToArray();
+        }
+
+        private sealed class ZoneUIEntryWriter : IWriter<ZoneUIEntry>
+        {
+            public void Write(IJsonWriter writer, ZoneUIEntry value) => value.Write(writer);
+        }
+    }
+}

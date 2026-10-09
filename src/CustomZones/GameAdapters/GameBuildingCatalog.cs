@@ -80,6 +80,22 @@ namespace CS2StyleMod.CustomZones.GameAdapters
             throw new KeyNotFoundException($"No registered building prefab named '{entry.PrefabId}'.");
         }
 
+        // Not part of IBuildingCatalog - a non-throwing counterpart to
+        // Resolve(ExplicitAssetEntry) above, for callers where "not found"
+        // is an ordinary case to skip rather than an exceptional one.
+        // CustomZoneBuilder uses this to check a candidate's real ZoneType
+        // against a zone's BaseZoneType before cloning it in - see
+        // DECISIONS.md "A collection's buildings aren't filtered by the
+        // zone's base type".
+        public bool TryResolve(ExplicitAssetEntry entry, out BuildingCandidate candidate)
+        {
+            if (TryGetBuildingPrefab(entry.PrefabId, out _, out var buildingEntity))
+                return TryDescribeBuilding(buildingEntity, out candidate);
+
+            candidate = null;
+            return false;
+        }
+
         // Not part of IBuildingCatalog - Core deliberately only deals in
         // plain BuildingCandidate values, never real game objects. Feature
         // logic (e.g. CustomZoneBuilder) that needs the actual prefab to

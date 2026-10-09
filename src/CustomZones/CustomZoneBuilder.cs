@@ -85,6 +85,18 @@ namespace CS2StyleMod.CustomZones
                     case VanillaSelectorEntry selector:
                         foreach (var candidate in m_Catalog.Resolve(selector))
                         {
+                            // A Collection is a zone-type-agnostic bag by
+                            // design (see Core.Collection) - nothing stops
+                            // a building whose own zone type doesn't match
+                            // this zone's BaseZoneType from ending up in an
+                            // attached collection. Silently excluded here,
+                            // not warned about - a selector can resolve
+                            // many candidates, and this is the expected,
+                            // common case for a collection shared across
+                            // zones of different types.
+                            if (candidate.ZoneType != definition.BaseZoneType)
+                                continue;
+
                             if (resolvedPrefabIds.Add(candidate.PrefabId) &&
                                 EnsureBuildingCloned(candidate.PrefabId, clonedZone, zoneType, internalZoneName, definition.Name))
                                 clonedCount++;
@@ -92,6 +104,28 @@ namespace CS2StyleMod.CustomZones
                         break;
 
                     case ExplicitAssetEntry explicitEntry:
+                        if (!m_Catalog.TryResolve(explicitEntry, out var explicitCandidate))
+                        {
+                            Mod.log.Warn($"[CustomZoneBuilder] Could not resolve building '{explicitEntry.PrefabId}' for zone '{definition.Name}' - skipping.");
+                            break;
+                        }
+
+                        // Same exclusion as the selector case above, just
+                        // warned about here: an explicit pick is a direct,
+                        // one-off user choice (e.g. via the building
+                        // picker), not a broad filter - found via real
+                        // in-game testing (2026-10-08): a ResidentialLow
+                        // zone offered a ResidentialMedium building for
+                        // construction because nothing checked this,
+                        // confirmed by reading the actual collections.json/
+                        // customZones.json data, not guessed. See
+                        // DECISIONS.md.
+                        if (explicitCandidate.ZoneType != definition.BaseZoneType)
+                        {
+                            Mod.log.Warn($"[CustomZoneBuilder] Skipping '{explicitEntry.PrefabId}' for zone '{definition.Name}' - its zone type ({explicitCandidate.ZoneType}) doesn't match the zone's base type ({definition.BaseZoneType}).");
+                            break;
+                        }
+
                         if (resolvedPrefabIds.Add(explicitEntry.PrefabId) &&
                             EnsureBuildingCloned(explicitEntry.PrefabId, clonedZone, zoneType, internalZoneName, definition.Name))
                             clonedCount++;

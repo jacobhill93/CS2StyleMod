@@ -2,6 +2,7 @@ import { bindValue, trigger, useValue } from "cs2/api";
 import { Button, Panel, Scrollable } from "cs2/ui";
 import { useState } from "react";
 import mod from "../../../mod.json";
+import { generateGuid } from "shared/generateGuid";
 
 interface CollectionEntry {
     id: string;
@@ -65,17 +66,3 @@ export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
         </Panel>
     );
 };
-
-// RFC4122-ish v4 GUID via Math.random - not cryptographically secure, which
-// is fine here (a collection id isn't a security boundary). Deliberately
-// not crypto.randomUUID(): cohtml's embedded JS runtime hasn't been
-// confirmed to expose the Web Crypto API, and a raw <select> already taught
-// this codebase not to assume a standard browser API just works here
-// without checking (see DECISIONS.md).
-function generateGuid(): string {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === "x" ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
-}
