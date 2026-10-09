@@ -295,12 +295,28 @@ was first created, just never used - every panel to date used inline
 `style` objects exclusively. Added the one missing piece (`UI/types/
 scss.d.ts`, a `*.module.scss` module declaration for TypeScript) and
 converted `ResizeHandle` as a deliberately small, isolated proof of concept
-- gave it a real `:hover` state (impossible before), confirmed end-to-end:
-webpack emits a real `CS2StyleMod.css` with correctly scoped class names
-(`.handle_Byk` etc.), it deploys alongside the `.mjs`, and `hasCSS` is
-present in the built output. **Not yet confirmed the hover effect actually
-renders in-game** - next test pass should check that specifically, plus
-that the regular drag/resize interaction still works post-conversion.
+- gave it a real `:hover` state (impossible before), confirmed at the
+BUILD level: webpack emits a real `CS2StyleMod.css` with correctly scoped
+class names (`.handle_Byk` etc.), it deploys alongside the `.mjs`, and
+`hasCSS` is present in the built output.
+
+**In-game result (2026-10-09): the handle was invisible/unfindable** - no
+JS exception logged anywhere, consistent with the stylesheet building
+correctly but never actually being loaded by the running game, not with
+any error. The build-time half of this mechanism is confirmed; the
+runtime-loading half (does the game actually read `hasCSS` and fetch the
+sibling `.css`, and if so from where/how) is NOT confirmed and was
+wrongly treated as settled - that was a real gap, caught by testing
+rather than by review. Reverted `ResizeHandle` back to inline styles (the
+known-working version) rather than leave it broken. `base.scss`/
+`ResizeHandle.module.scss`/`UI/types/scss.d.ts` are left in the tree,
+unused - don't build further styling on this pipeline until the runtime-
+loading question is actually answered (check the official
+`@colossalorder/create-csii-ui-mod` toolchain's own example/template
+output for a working reference, since it ships the config deliberately;
+or find a real third-party mod that ships a `.module.scss` and confirm
+its CSS actually visibly applies in-game, the same way MeasureItCS2/City
+Watchdog/HallOfFame were checked for the drag/resize question).
 
 Added `UI/src/shared/base.scss` as a small shared foundation (a spacing
 scale, a `@mixin interactive-transition`) for future `.module.scss` files
