@@ -33,25 +33,32 @@ namespace CS2StyleMod.UI
             m_Zones = new ValueBinding<ZoneUIEntry[]>(Group, "Zones", GetEntries(), new ArrayWriter<ZoneUIEntry>(new ZoneUIEntryWriter(), false));
             AddBinding(m_Zones);
 
-            AddBinding(new TriggerBinding<string, string>(Group, "CreateZone", OnCreateZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
+            AddBinding(new TriggerBinding<string, string, string>(Group, "CreateZone", OnCreateZone, ValueReaders.Create<string>(), ValueReaders.Create<string>(), ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string>(Group, "DeleteZone", OnDeleteZone, ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string, string>(Group, "RenameZone", OnRenameZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string, string>(Group, "AddCollectionToZone", OnAddCollectionToZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
             AddBinding(new TriggerBinding<string, string>(Group, "RemoveCollectionFromZone", OnRemoveCollectionFromZone, ValueReaders.Create<string>(), ValueReaders.Create<string>()));
         }
 
-        private void OnCreateZone(string id, string name)
+        private void OnCreateZone(string id, string name, string baseZoneType)
         {
             if (!Guid.TryParse(id, out var guid) || string.IsNullOrWhiteSpace(name))
                 return;
+            if (!Enum.TryParse<ZoneType>(baseZoneType, out var zoneType))
+                return;
 
-            // Every custom zone defaults to ResidentialLow for now - which
-            // top-level category (or categories) a zone should be offered
-            // under is a real open question (see DECISIONS.md), deferred
-            // rather than guessed at. Built immediately with zero
-            // collections so the zone shell exists and is paintable right
-            // away, before any building is attached.
-            var definition = new CustomZoneDefinition(guid, name, ZoneType.ResidentialLow);
+            // Chosen once, at creation, not editable afterward - see
+            // DECISIONS.md "A zone's base type is fixed at creation, not
+            // editable afterward" for why: BuildOrRebuild finds-or-clones
+            // its zone by a stable internal name derived from
+            // definition.Id, not BaseZoneType, so changing it post-creation
+            // wouldn't actually re-clone a different vanilla zone - it'd
+            // just change which buildings the eligibility filter accepts
+            // while the zone itself kept whatever density it was first
+            // cloned as. Built immediately with zero collections so the
+            // zone shell exists and is paintable right away, before any
+            // building is attached.
+            var definition = new CustomZoneDefinition(guid, name, zoneType);
             Mod.CustomZoneDefinitionLibrary.Save(definition);
             m_BuildRequestSystem.Request(definition, Enumerable.Empty<Collection>());
             RefreshZones();

@@ -3,6 +3,7 @@ import { Button, Panel, Scrollable } from "cs2/ui";
 import { useState } from "react";
 import mod from "../../../mod.json";
 import { generateGuid } from "shared/generateGuid";
+import { ANY, FilterDropdown } from "shared/FilterDropdown";
 
 interface ZoneEntry {
     id: string;
@@ -19,19 +20,37 @@ interface ZonePanelProps {
     onEdit?: (id: string, name: string) => void;
 }
 
+// Mirrors Core.ZoneType exactly (src/Core/Primitives.cs) - a small, stable
+// set of the game's own real zone categories, not something we invented.
+// Fixed at creation only, not editable afterward - see ZoneUISystem's
+// OnCreateZone comment for why (the underlying vanilla zone clone is
+// permanent once built, same as vanilla CS2 itself has no "convert this
+// zone to a different density" action).
+const BASE_ZONE_TYPES = [
+    "ResidentialLow",
+    "ResidentialMedium",
+    "ResidentialHigh",
+    "CommercialLow",
+    "CommercialHigh",
+    "Office",
+    "Industrial",
+];
+
 const Zones$ = bindValue<ZoneEntry[]>(mod.id, "Zones", []);
 
 export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     const zones = useValue(Zones$);
     const [newName, setNewName] = useState("");
+    const [newBaseZoneType, setNewBaseZoneType] = useState(ANY);
 
     const onCreate = () => {
         const name = newName.trim();
-        if (!name) return;
+        if (!name || newBaseZoneType === ANY) return;
 
         const id = generateGuid();
-        trigger(mod.id, "CreateZone", id, name);
+        trigger(mod.id, "CreateZone", id, name, newBaseZoneType);
         setNewName("");
+        setNewBaseZoneType(ANY);
         onCreated?.(id, name);
     };
 
@@ -47,7 +66,9 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                         key={zone.id}
                         style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}
                     >
-                        <span>{zone.name} ({zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})</span>
+                        <span>
+                            {zone.name} ({zone.baseZoneType}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
+                        </span>
                         <div style={{ display: "flex", gap: "4px" }}>
                             <Button onSelect={() => onEdit?.(zone.id, zone.name)}>Edit</Button>
                             <Button onSelect={() => trigger(mod.id, "DeleteZone", zone.id)}>Delete</Button>
@@ -62,7 +83,8 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                     placeholder="New zone name"
                     style={{ flex: 1 }}
                 />
-                <Button onSelect={onCreate}>Create</Button>
+                <FilterDropdown label="Base type" options={BASE_ZONE_TYPES} value={newBaseZoneType} onChange={setNewBaseZoneType} />
+                <Button disabled={!newName.trim() || newBaseZoneType === ANY} onSelect={onCreate}>Create</Button>
             </div>
         </Panel>
     );

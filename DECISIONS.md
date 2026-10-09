@@ -271,6 +271,38 @@ in-game) - worked around by importing the module as a namespace and
 casting that one property (`cs2ui.DropdownItem as unknown as (props:
 ...) => JSX.Element`), not by trying to fix the shipped `.d.ts` itself.
 
+### A zone's base type is chosen at creation, and fixed afterward (2026-10-08)
+Zone creation originally hardcoded every new zone to `ResidentialLow` (a
+deliberate stopgap, not a decision - "for now they can always show up in
+residential" per the user). Replaced with a real picker: `ZonePanel` now
+has a `FilterDropdown` of all seven `Core.ZoneType` values, and
+`ZoneUISystem.OnCreateZone` takes the choice as a third parameter.
+
+Deliberately NOT made editable after creation, for a real structural
+reason, not just because it was easier: `CustomZoneBuilder.BuildOrRebuild`
+finds-or-clones its zone by a stable internal name derived from
+`definition.Id`, not `BaseZoneType` - so changing `BaseZoneType` later
+wouldn't re-clone a different vanilla zone template. It would just change
+which buildings the new eligibility filter (see next entry) accepts, while
+the zone itself silently kept whatever density/look it was first cloned
+as - a real mismatch bug, not a theoretical one. This also matches vanilla
+CS2 itself: there's no "convert this zone to a different density" action
+there either.
+
+This surfaced a genuine architecture question from the user: if a
+Collection holds Low+Medium+High residential buildings, does one zone
+choose among all of them, pulling equally from each demand bar? **No** -
+and can't, by the game's own design. Each `ZonePrefab` has exactly one
+`ZoneData.m_AreaType`/density (see "Demand is shared with vanilla, by
+design" below) - Low/Medium/High are three genuinely separate demand bars
+in vanilla CS2, not one bar with a sub-dial. A single `CustomZoneDefinition`
+can only ever target one of them. The supported way to get "one curated
+building set, all densities": create three zones (one per density) and
+attach the *same* Collection(s) to all three - the per-zone eligibility
+filter below means each zone automatically pulls out just its own tier
+from the shared pool. Not a limitation of this mod specifically; it's
+how the simulation itself is structured.
+
 ### A collection's buildings aren't filtered by the zone's base type (found and fixed 2026-10-08)
 Found via real in-game testing, not guessed: a "Main Zone" (`BaseZoneType =
 ResidentialLow`) with two attached collections spawned a
