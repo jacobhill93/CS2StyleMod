@@ -6,21 +6,35 @@ take down the other.
 
 ## Module layout
 
+District Themes is shelved (see DECISIONS.md) - its `GameAdapters/` and
+`Debug/` spike remain on the unmerged `district-themes` branch, not here.
+
 ```
+Mod.cs                 mod entry point
 src/
-  Core/              collections, adopted assets, settings, logging,
-                     candidate-filter logic (no game-specific spawn code)
-  CustomZones/       depends on Core only
-    GameAdapters/    every game touchpoint used by this feature
-  DistrictThemes/    depends on Core only
-    GameAdapters/    every game touchpoint used by this feature
-  UI/
-    core/            collection editor, building picker
-    customZones/
-    districtThemes/
+  Core/                collections, adopted assets, settings, logging,
+                       candidate-filter logic (no game-specific spawn code)
+  CustomZones/         depends on Core only
+    GameAdapters/      every game touchpoint used by this feature
+  UI/                  C# UI-binding systems (ValueBinding/TriggerBinding),
+                       one file per bound panel - talks to Core, never to
+                       GameAdapters directly
 tools/
-  touchpoint-dump/   dumps signatures of game types/methods we depend on
-TOUCHPOINTS.md       inventory of game internals we depend on
+  touchpoint-dump/     dumps signatures of game types/methods we depend on
+TOUCHPOINTS.md         inventory of game internals we depend on
+
+UI/                    the mod's actual UI (TypeScript/React) - a separate
+                       npm/webpack project, sibling to Mod.cs, scaffolded
+                       via the official create-csii-ui-mod template (not
+                       nested under src/ - that's real-mod convention,
+                       confirmed against Find It/JadHajjar-FindIt-CSII,
+                       not the original per-feature-nested guess).
+                       `dotnet build` also runs its webpack build (see
+                       CS2StyleMod.csproj's BuildUI target), so there's
+                       still one build command for the whole mod.
+  src/mods/<Name>/     one React component folder per bound panel,
+                       matching the C# UI-binding system (src/UI/) it
+                       pairs with 1:1
 ```
 
 ### Rules

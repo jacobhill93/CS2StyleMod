@@ -3,6 +3,7 @@ using Colossal.Logging;
 using Colossal.PSI.Environment;
 using CS2StyleMod.Core;
 using CS2StyleMod.CustomZones;
+using CS2StyleMod.UI;
 using Game;
 using Game.Common;
 using Game.Modding;
@@ -53,6 +54,9 @@ namespace CS2StyleMod
             // UpdateBefore<_, PrefabSystem>, so its OnUpdate always lands
             // immediately before PrefabSystem's own tick in the same frame.
             updateSystem.UpdateBefore<CustomZoneBuildRequestSystem, PrefabSystem>(SystemUpdatePhase.MainLoop);
+
+            // Same phase every UI-binding system in the game uses.
+            updateSystem.UpdateAt<CollectionUISystem>(SystemUpdatePhase.UIUpdate);
         }
 
         public void OnDispose()
