@@ -94,14 +94,14 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                                 <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
                                     <Button
+                                        variant="icon"
                                         src={Icons.trash}
+                                        tooltipLabel="Confirm delete"
                                         onSelect={() => {
                                             trigger(mod.id, "DeleteCollection", collection.id);
                                             setConfirmingDeleteId(null);
                                         }}
-                                    >
-                                        Confirm
-                                    </Button>
+                                    />
                                 </div>
                             </>
                         ) : (
@@ -112,8 +112,15 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                                     {collection.name} ({collection.entryCount})
                                 </span>
                                 <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                                    <Button src={Icons.pencil} onSelect={() => onEdit?.(collection.id, collection.name)}>Edit</Button>
-                                    <Button src={Icons.trash} onSelect={() => setConfirmingDeleteId(collection.id)}>Delete</Button>
+                                    {/* Icon-only (variant="icon", no text children), not icon+label -
+                                        confirmed in-game that icon+label overlapped and got clipped off
+                                        the panel edge in this tight a row. Matches how real CS2 mods
+                                        handle dense list-row actions (Find It/Road Builder, both
+                                        variant="icon" throughout - see DECISIONS.md). tooltipLabel keeps
+                                        this accessible per the earlier wireframe review's rule that
+                                        icon-only actions need a title/label. */}
+                                    <Button variant="icon" src={Icons.pencil} tooltipLabel="Edit" onSelect={() => onEdit?.(collection.id, collection.name)} />
+                                    <Button variant="icon" src={Icons.trash} tooltipLabel="Delete" onSelect={() => setConfirmingDeleteId(collection.id)} />
                                 </div>
                             </>
                         )}
@@ -131,7 +138,7 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                         placeholder="New collection name"
                         style={{ flex: 1 }}
                     />
-                    <Button src={Icons.plus} onSelect={onCreate}>Create</Button>
+                    <Button onSelect={onCreate}>Create</Button>
                 </div>
                 {nameError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name required.</span>}
             </div>

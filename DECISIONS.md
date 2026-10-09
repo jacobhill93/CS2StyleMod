@@ -51,7 +51,23 @@ naming rule is about not mislabeling one action as another, which is
 carried entirely by the TEXT label (still "Remove" vs "Delete",
 unchanged); within any single panel there's never a Trash-icon Remove
 button sitting next to a Trash-icon Delete button for the same entity, so
-there's nothing to actually confuse. Not yet confirmed in-game.
+there's nothing to actually confuse.
+
+**In-game result: icons loaded correctly (confirms the mechanism works),
+but icon+text combo buttons (passing both `src` and visible text
+children) overlapped and got clipped off the panel edge** - on every such
+button, not just the tight list rows, which suggests this isn't purely a
+"not enough room" problem but that `cs2/ui`'s icon+label layout doesn't
+render with correct spacing in this environment at all. Fixed by
+switching every dense-row action (Edit/Delete/Confirm/Add/Remove) to
+icon-only (`variant="icon"`, no text children, `tooltipLabel` for
+accessibility per the wireframe review's own rule) - this exactly matches
+how real CS2 mods handle these (Find It/Road Builder: "every clickable
+control is `cs2/ui`'s `Button`, always `variant=\"icon\"`", confirmed via
+earlier research, not newly assumed). Left `Create` as plain text with no
+icon, rather than also guess at some OTHER icon+text combination that
+might work - it's the one known-good state next to two now-confirmed
+failure modes. Not yet re-confirmed in-game.
 
 ### Resize handle click-through: the z-index fix didn't actually work - real fix was removing the height mismatch (2026-10-09)
 Follow-up correction to the anchoring fix below. That fix (moving

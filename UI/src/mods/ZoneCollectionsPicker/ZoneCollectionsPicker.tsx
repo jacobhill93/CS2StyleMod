@@ -62,15 +62,15 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
                                 {collection.name} ({collection.entryCount})
                             </span>
                             <Button
+                                variant="icon"
                                 style={{ flexShrink: 0 }}
                                 src={attached ? Icons.trash : Icons.plus}
+                                tooltipLabel={attached ? "Remove" : "Add"}
                                 selected={attached}
                                 onSelect={() =>
                                     trigger(mod.id, attached ? "RemoveCollectionFromZone" : "AddCollectionToZone", zoneId, collection.id)
                                 }
-                            >
-                                {attached ? "Remove" : "Add"}
-                            </Button>
+                            />
                         </div>
                     );
                 })}

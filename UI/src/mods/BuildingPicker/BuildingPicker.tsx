@@ -154,16 +154,16 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                                 {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]
                             </span>
                             <Button
+                                variant="icon"
                                 style={{ flexShrink: 0 }}
                                 src={alreadyAdded ? Icons.trash : Icons.plus}
+                                tooltipLabel={alreadyAdded ? "Remove" : "Add"}
                                 disabled={targetCollectionId === ANY}
                                 selected={alreadyAdded}
                                 onSelect={() =>
                                     trigger(mod.id, alreadyAdded ? "RemoveBuildingFromCollection" : "AddBuildingToCollection", targetCollectionId, building.prefabId)
                                 }
-                            >
-                                {alreadyAdded ? "Remove" : "Add"}
-                            </Button>
+                            />
                         </div>
                     );
                 })}
