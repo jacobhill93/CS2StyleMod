@@ -2,6 +2,30 @@
 
 ## Decisions
 
+### Resize handle click-through: the z-index fix didn't actually work - real fix was removing the height mismatch (2026-10-09)
+Follow-up correction to the anchoring fix below. That fix (moving
+`ResizeHandle` to be `Panel`'s sibling instead of its child, to anchor it
+to the full declared panel height rather than wherever `Panel`'s content
+happened to end) visually worked but broke click-through; a same-day
+z-index bump was applied as the fix and *claimed* to resolve it in the
+commit message, without being retested in-game first. **It didn't work** -
+confirmed on the next real test pass, the handle still wasn't clickable.
+Guessing a z-index value against an opaque, unverifiable "maybe Panel's
+own chrome has a higher internal z-index" theory was the wrong approach
+twice in a row.
+
+Real fix: stop creating the height mismatch in the first place, rather
+than fighting its symptom. `Scrollable` now gets an exact `height` (not
+`maxHeight`) equal to the intended content height, so `Panel`'s own
+natural/auto height (header + that exact Scrollable height + the
+create-row) always equals the full declared panel size with no leftover
+gap - and `ResizeHandle` moved back to being `Panel`'s own child, the
+exact arrangement already proven clickable before any of this. No z-index
+needed. Lesson: when a fix is based on an unverifiable theory about a
+third-party component's internals (here, "Panel might set its own
+z-index"), say so plainly and treat it as unconfirmed until actually
+retested - don't write the commit message as if it's settled.
+
 ### Adapted RoadBuilder's ExtendedUISystemBase (MIT) to cut C# binding boilerplate (2026-10-09)
 A second external-mod research pass (Road Builder, github.com/JadHajjar/
 RoadBuilder-CSII) found and confirmed a genuinely permissive **MIT**
