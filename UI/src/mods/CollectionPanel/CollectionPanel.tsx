@@ -72,14 +72,22 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                 {collections.map((collection) => (
                     <div
                         key={collection.id}
-                        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }}
+                        style={
+                            confirmingDeleteId === collection.id
+                                ? { display: "flex", flexDirection: "column", gap: "4px", padding: "4px 0" }
+                                : { display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }
+                        }
                     >
                         {confirmingDeleteId === collection.id ? (
                             <>
-                                <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "12px" }}>
+                                {/* Stacked (message, then buttons on their own row) rather than
+                                    side-by-side in one flex row - confirmed in-game that a long
+                                    message next to fixed-width buttons didn't wrap the way a
+                                    normal browser would, and ended up visually hidden behind them. */}
+                                <span style={{ fontSize: "12px" }}>
                                     Delete "{collection.name}"? It will be detached from any zones using it - the buildings in those zones aren't affected.
                                 </span>
-                                <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                                <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
                                     <Button
                                         onSelect={() => {

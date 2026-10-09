@@ -84,14 +84,20 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                 {zones.map((zone) => (
                     <div
                         key={zone.id}
-                        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }}
+                        style={
+                            confirmingDeleteId === zone.id
+                                ? { display: "flex", flexDirection: "column", gap: "4px", padding: "4px 0" }
+                                : { display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }
+                        }
                     >
                         {confirmingDeleteId === zone.id ? (
                             <>
-                                <span style={{ flex: "1 1 auto", minWidth: 0, fontSize: "12px" }}>
+                                {/* Stacked, not side-by-side - see CollectionPanel's identical
+                                    comment for why. */}
+                                <span style={{ fontSize: "12px" }}>
                                     Delete "{zone.name}"? Its collections remain available for other zones.
                                 </span>
-                                <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                                <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
                                     <Button
                                         onSelect={() => {

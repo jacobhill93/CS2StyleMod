@@ -18,6 +18,14 @@
     bottom: 0;
     width: 14px;
     height: 14px;
+    // Confirmed in-game (2026-10-09): visible in the right place but not
+    // clickable, after becoming a sibling of Panel rather than its child
+    // (see git history). Panel likely applies its own backdrop-filter/
+    // filter for a frosted-glass look, which establishes a new CSS
+    // stacking context and can paint above a plain sibling regardless of
+    // DOM order. Forcing this above Panel explicitly rather than relying
+    // on source order.
+    z-index: 10;
     cursor: nwse-resize;
     background-image: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.5) 50%);
     @include base.interactive-transition(background-image);
