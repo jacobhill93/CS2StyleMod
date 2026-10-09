@@ -38,17 +38,21 @@ export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
     return (
         <Panel
             header="Collections"
-            style={{ position: "absolute", top: "100px", left: "100px", width: "320px" }}
+            style={{ position: "absolute", top: "100px", left: "100px", width: "360px" }}
         >
             <Scrollable vertical style={{ maxHeight: "300px" }}>
                 {collections.length === 0 && <div>No collections yet.</div>}
                 {collections.map((collection) => (
                     <div
                         key={collection.id}
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}
+                        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }}
                     >
-                        <span>{collection.name} ({collection.entryCount})</span>
-                        <Button onSelect={() => trigger(mod.id, "DeleteCollection", collection.id)}>
+                        {/* minWidth:0 is required for a flex item to actually shrink/
+                            truncate instead of pushing the Delete button off-panel. */}
+                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {collection.name} ({collection.entryCount})
+                        </span>
+                        <Button style={{ flexShrink: 0 }} onSelect={() => trigger(mod.id, "DeleteCollection", collection.id)}>
                             Delete
                         </Button>
                     </div>

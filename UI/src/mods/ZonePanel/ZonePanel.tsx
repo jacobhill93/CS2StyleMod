@@ -57,19 +57,23 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     return (
         <Panel
             header="Zones"
-            style={{ position: "absolute", top: "440px", left: "100px", width: "360px" }}
+            style={{ position: "absolute", top: "440px", left: "100px", width: "460px" }}
         >
             <Scrollable vertical style={{ maxHeight: "300px" }}>
                 {zones.length === 0 && <div>No zones yet.</div>}
                 {zones.map((zone) => (
                     <div
                         key={zone.id}
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}
+                        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }}
                     >
-                        <span>
+                        {/* overflow/textOverflow/minWidth:0 is the standard flexbox
+                            truncation trio - without minWidth:0 a flex item refuses to
+                            shrink below its content width, which is what was pushing
+                            Edit/Delete off the edge of the panel for longer zone names. */}
+                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {zone.name} ({zone.baseZoneType}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
                         </span>
-                        <div style={{ display: "flex", gap: "4px" }}>
+                        <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
                             <Button onSelect={() => onEdit?.(zone.id, zone.name)}>Edit</Button>
                             <Button onSelect={() => trigger(mod.id, "DeleteZone", zone.id)}>Delete</Button>
                         </div>

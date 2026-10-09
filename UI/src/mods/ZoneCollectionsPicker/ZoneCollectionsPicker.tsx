@@ -48,10 +48,13 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
                     return (
                         <div
                             key={collection.id}
-                            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}
+                            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 0" }}
                         >
-                            <span>{collection.name} ({collection.entryCount})</span>
+                            <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {collection.name} ({collection.entryCount})
+                            </span>
                             <Button
+                                style={{ flexShrink: 0 }}
                                 selected={attached}
                                 onSelect={() =>
                                     trigger(mod.id, attached ? "RemoveCollectionFromZone" : "AddCollectionToZone", zoneId, collection.id)

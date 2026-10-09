@@ -120,13 +120,16 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                 {filtered.map((building) => (
                     <div
                         key={building.prefabId}
-                        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", fontSize: "12px", gap: "6px" }}
+                        style={{ display: "flex", alignItems: "center", gap: "6px", padding: "2px 0", fontSize: "12px" }}
                     >
-                        <span>{building.prefabId}</span>
-                        <span style={{ flex: "1 1 auto", textAlign: "right" }}>
+                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {building.prefabId}
+                        </span>
+                        <span style={{ flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "right" }}>
                             {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]
                         </span>
                         <Button
+                            style={{ flexShrink: 0 }}
                             disabled={targetCollectionId === ANY}
                             onSelect={() => trigger(mod.id, "AddBuildingToCollection", targetCollectionId, building.prefabId)}
                         >
