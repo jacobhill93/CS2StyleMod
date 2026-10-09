@@ -5,6 +5,7 @@ import { useDraggable } from "shared/useDraggable";
 import { DraggableHeader } from "shared/DraggableHeader";
 import { useResizable } from "shared/useResizable";
 import { ResizeHandle } from "shared/ResizeHandle";
+import { Icons } from "shared/icons";
 
 interface CollectionEntry {
     id: string;
@@ -62,6 +63,7 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
                             </span>
                             <Button
                                 style={{ flexShrink: 0 }}
+                                src={attached ? Icons.trash : Icons.plus}
                                 selected={attached}
                                 onSelect={() =>
                                     trigger(mod.id, attached ? "RemoveCollectionFromZone" : "AddCollectionToZone", zoneId, collection.id)

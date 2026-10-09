@@ -8,6 +8,7 @@ import { useDraggable } from "shared/useDraggable";
 import { DraggableHeader } from "shared/DraggableHeader";
 import { useResizable } from "shared/useResizable";
 import { ResizeHandle } from "shared/ResizeHandle";
+import { Icons } from "shared/icons";
 
 interface ZoneEntry {
     id: string;
@@ -100,6 +101,7 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                                 <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
                                     <Button
+                                        src={Icons.trash}
                                         onSelect={() => {
                                             trigger(mod.id, "DeleteZone", zone.id);
                                             setConfirmingDeleteId(null);
@@ -119,8 +121,8 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                                     {zone.name} ({zone.baseZoneType}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
                                 </span>
                                 <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                                    <Button onSelect={() => onEdit?.(zone.id, zone.name)}>Edit</Button>
-                                    <Button onSelect={() => setConfirmingDeleteId(zone.id)}>Delete</Button>
+                                    <Button src={Icons.pencil} onSelect={() => onEdit?.(zone.id, zone.name)}>Edit</Button>
+                                    <Button src={Icons.trash} onSelect={() => setConfirmingDeleteId(zone.id)}>Delete</Button>
                                 </div>
                             </>
                         )}
@@ -147,7 +149,7 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                             if (createError) setCreateError(false);
                         }}
                     />
-                    <Button onSelect={onCreate}>Create</Button>
+                    <Button src={Icons.plus} onSelect={onCreate}>Create</Button>
                 </div>
                 {createError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name and base type are both required.</span>}
             </div>

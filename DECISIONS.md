@@ -2,6 +2,37 @@
 
 ## Decisions
 
+### First Unified Icon Library integration pass (2026-10-09)
+Wired real icons (`coui://uil/Standard/<Name>.svg`, confirmed Apache-2.0
+and purely optional - see the earlier icon-library research entry) into
+every Create/Edit/Delete/Confirm/Add/Remove button across all four
+panels, using `cs2/ui`'s `Button` directly - confirmed via `UI/types/
+ui.d.ts` that `Button`'s real prop type already merges in
+`Partial<LabeledIconButtonProps>` (`src`, optional `theme`), so no
+separate `IconButton`/`MenuButton` component was needed, just an extra
+`src` prop alongside the existing `children` text.
+
+Only icon names the earlier research actually confirmed exist in UIL's
+catalog were used (`Plus`, `Trash`, `Pencil`) - an unconfirmed name would
+just 404 into a blank icon slot, worse than no icon at all. No formal
+dependency declaration was added to `mod.json` - confirmed (via other
+mods' actual deployed output) that this is a plain runtime URL reference
+that 404s silently if UIL isn't installed, not an API call requiring
+load-order coordination, so a hard/soft dependency entry isn't needed for
+it to work; could add one later purely so a mod manager lists it as
+recommended, but that's cosmetic, not functional.
+
+Reused the Trash icon for both true deletion (Collection/Zone Delete,
+Confirm) and relationship removal (Collection↔Zone detach, building
+removed from a Collection) - reconsidered the earlier instinct to avoid
+that overlap (see the wireframe-review entry's "Remove" vs "Delete"
+naming decision) and concluded it doesn't actually apply here: that
+naming rule is about not mislabeling one action as another, which is
+carried entirely by the TEXT label (still "Remove" vs "Delete",
+unchanged); within any single panel there's never a Trash-icon Remove
+button sitting next to a Trash-icon Delete button for the same entity, so
+there's nothing to actually confuse. Not yet confirmed in-game.
+
 ### Resize handle click-through: the z-index fix didn't actually work - real fix was removing the height mismatch (2026-10-09)
 Follow-up correction to the anchoring fix below. That fix (moving
 `ResizeHandle` to be `Panel`'s sibling instead of its child, to anchor it

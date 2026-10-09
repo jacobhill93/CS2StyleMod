@@ -7,6 +7,7 @@ import { useDraggable } from "shared/useDraggable";
 import { DraggableHeader } from "shared/DraggableHeader";
 import { useResizable } from "shared/useResizable";
 import { ResizeHandle } from "shared/ResizeHandle";
+import { Icons } from "shared/icons";
 
 interface CollectionEntry {
     id: string;
@@ -93,6 +94,7 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                                 <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
                                     <Button
+                                        src={Icons.trash}
                                         onSelect={() => {
                                             trigger(mod.id, "DeleteCollection", collection.id);
                                             setConfirmingDeleteId(null);
@@ -110,8 +112,8 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                                     {collection.name} ({collection.entryCount})
                                 </span>
                                 <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                                    <Button onSelect={() => onEdit?.(collection.id, collection.name)}>Edit</Button>
-                                    <Button onSelect={() => setConfirmingDeleteId(collection.id)}>Delete</Button>
+                                    <Button src={Icons.pencil} onSelect={() => onEdit?.(collection.id, collection.name)}>Edit</Button>
+                                    <Button src={Icons.trash} onSelect={() => setConfirmingDeleteId(collection.id)}>Delete</Button>
                                 </div>
                             </>
                         )}
@@ -129,7 +131,7 @@ export const CollectionPanel = ({ onCreated, onEdit }: CollectionPanelProps = {}
                         placeholder="New collection name"
                         style={{ flex: 1 }}
                     />
-                    <Button onSelect={onCreate}>Create</Button>
+                    <Button src={Icons.plus} onSelect={onCreate}>Create</Button>
                 </div>
                 {nameError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name required.</span>}
             </div>

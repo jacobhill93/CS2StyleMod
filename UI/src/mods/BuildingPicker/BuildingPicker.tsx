@@ -7,6 +7,7 @@ import { useDraggable } from "shared/useDraggable";
 import { DraggableHeader } from "shared/DraggableHeader";
 import { useResizable } from "shared/useResizable";
 import { ResizeHandle } from "shared/ResizeHandle";
+import { Icons } from "shared/icons";
 
 interface BuildingEntry {
     prefabId: string;
@@ -154,6 +155,7 @@ export const BuildingPicker = ({ initialTargetCollectionId, onClose }: BuildingP
                             </span>
                             <Button
                                 style={{ flexShrink: 0 }}
+                                src={alreadyAdded ? Icons.trash : Icons.plus}
                                 disabled={targetCollectionId === ANY}
                                 selected={alreadyAdded}
                                 onSelect={() =>
