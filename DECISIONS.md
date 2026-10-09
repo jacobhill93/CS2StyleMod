@@ -231,6 +231,46 @@ state exists just because a system's `OnCreate` has run. Fixed by keeping
 `GetAllBuildings()` snapshot + `ValueBinding.Update(...)` into `OnGameLoaded`
 - confirmed in-game afterward, full list populated correctly.
 
+### `cs2/ui` has no native `<select>` - it crashes the entire game HUD, not just the mod panel (2026-10-08)
+Chunk 3's first pass used plain `<select>`/`<option>` for the picker's
+dropdown filters (zone type, level, lot width/depth, asset pack) - the same
+"fall back to plain HTML where `cs2/ui` doesn't provide the primitive"
+pattern that already worked for the name-search `<input>`. In-game result:
+**the entire HUD disappeared**, not just our panel. Root-caused via
+`UI.log`, not guessed: a `TypeError: Cannot read properties of undefined
+(reading 'length')` repeating every UI update frame, thrown inside the
+*game's own* core bundle (`assetdb://gameui/index.js`), not ours - every
+mod panel appended via `moduleRegistry.append('Game', ...)` shares one
+render tree with the vanilla HUD, with no error boundary around an
+individual appended panel, so an uncaught throw in ours takes the whole
+tree down. Confirmed via the real type declarations (`UI/types/ui.d.ts`,
+shipped with the modding toolchain, not guessed from memory) that `cs2/ui`
+has no `<select>` equivalent at all - it has a purpose-built
+`Dropdown`/`DropdownToggle`/`DropdownItem` component set instead ("Used to
+select between a number of mutually exclusive values", per its own doc
+comment). Rewrote the filter bar on top of that; confirmed in-game
+afterward - all five filters render, filter correctly, and the dropdown
+popups layer above each other and the rest of the panel correctly.
+**Lesson for any future UI work**: a broken mod panel is not necessarily
+contained to that panel - verify new, previously-unused host elements
+(raw HTML tags, not `cs2/ui` components) carefully, and `UI.log` (not just
+`CS2StyleMod.Mod.log`) is where a render-time JS exception actually shows
+up, with a full stack trace.
+
+Also found and worked around in the same pass: `cs2/ui`'s own ambient type
+declarations have a real bug, not just an omission - `export interface
+DropdownItem<T>` (a plain data-shape type) and the actual `DropdownItem`
+*component* (internally named `DropdownItem$1`, re-exported under the
+`DropdownItem` alias at the bottom of the file) collide, and TypeScript
+only resolves the name to its type half: `import { DropdownItem } from
+"cs2/ui"` compiles, but using it as a JSX tag fails with "'DropdownItem'
+only refers to a type, but is being used as a value here." The component
+itself is real at runtime (same `window`-global mechanism every other
+`cs2/ui` import resolves through, confirmed by the fix actually working
+in-game) - worked around by importing the module as a namespace and
+casting that one property (`cs2ui.DropdownItem as unknown as (props:
+...) => JSX.Element`), not by trying to fix the shipped `.d.ts` itself.
+
 ### Buffer gaps found via real `Collection` orchestration (2026-10-08, historical)
 Before the timing root cause above was found, the first end-to-end proof
 (one hardcoded building, via the now-deleted workaround) didn't generalize:

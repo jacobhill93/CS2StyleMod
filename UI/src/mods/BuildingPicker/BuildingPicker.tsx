@@ -1,6 +1,23 @@
 import { bindValue, useValue } from "cs2/api";
-import { Panel, Scrollable } from "cs2/ui";
+import { Button, Dropdown, DropdownToggle, Panel, Scrollable } from "cs2/ui";
+import * as cs2ui from "cs2/ui";
+import { ReactNode, useMemo, useState } from "react";
 import mod from "../../../mod.json";
+
+// cs2/ui's own ambient type declarations (UI/types/ui.d.ts) declare both a
+// plain data interface `DropdownItem<T>` (item shape) and re-export the
+// real component under that same name from its internal name
+// `DropdownItem$1` - the two collide, and the named import only resolves
+// to the type half ("only refers to a type, but is being used as a value
+// here"). The component itself is real (same runtime window global every
+// other cs2/ui import resolves to) - this just works around the broken
+// named-export typing for it specifically.
+const DropdownItem = cs2ui.DropdownItem as unknown as (props: {
+    value: string;
+    selected?: boolean;
+    onChange?: (value: string) => void;
+    children?: ReactNode;
+}) => JSX.Element;
 
 interface BuildingEntry {
     prefabId: string;
@@ -14,19 +31,110 @@ interface BuildingEntry {
 
 const Buildings$ = bindValue<BuildingEntry[]>(mod.id, "Buildings", []);
 
-// Bare list only - proves the binding pipeline for GetAllBuildings() end to
-// end. Search/filter controls and the "add to collection" action are
-// planned next, as client-side React logic over this same full list.
+// Empty string means "any" for every filter below.
+const ANY = "";
+
+interface FilterDropdownProps {
+    label: string;
+    options: string[];
+    value: string;
+    onChange: (value: string) => void;
+    formatOption?: (value: string) => string;
+}
+
+// cs2/ui has no native <select> - raw <select>/<option> crashed the whole
+// game UI render tree in-game (confirmed via UI.log: a TypeError inside the
+// game's own core bundle, not ours - there's no error boundary around an
+// individually appended mod panel, so one throw there takes down the
+// entire HUD). Dropdown/DropdownToggle/DropdownItem (from the real cs2/ui
+// type declarations, UI/types/ui.d.ts) is the actual supported mechanism
+// for "select one of several mutually exclusive values" - this wraps it
+// once since five filters need the same shape.
+const FilterDropdown = ({ label, options, value, onChange, formatOption }: FilterDropdownProps) => {
+    const format = formatOption ?? ((v: string) => v);
+    return (
+        <Dropdown
+            content={
+                <>
+                    <DropdownItem value={ANY} selected={value === ANY} onChange={onChange}>{label}</DropdownItem>
+                    {options.map((option) => (
+                        <DropdownItem key={option} value={option} selected={value === option} onChange={onChange}>
+                            {format(option)}
+                        </DropdownItem>
+                    ))}
+                </>
+            }
+        >
+            <DropdownToggle>{value === ANY ? label : format(value)}</DropdownToggle>
+        </Dropdown>
+    );
+};
+
+// All filtering is client-side over the one full list the backend sends
+// (same approach Find It uses) - no server-side query, no refetch per
+// keystroke. Not included: a "building size (low/med/high)" filter - still
+// an open question (see DECISIONS.md "Building picker 'size' filter"),
+// deferred rather than guessed at.
 export const BuildingPicker = () => {
     const buildings = useValue(Buildings$);
 
+    const [nameFilter, setNameFilter] = useState("");
+    const [zoneTypeFilter, setZoneTypeFilter] = useState(ANY);
+    const [levelFilter, setLevelFilter] = useState(ANY);
+    const [lotWidthFilter, setLotWidthFilter] = useState(ANY);
+    const [lotDepthFilter, setLotDepthFilter] = useState(ANY);
+    const [assetPackFilter, setAssetPackFilter] = useState(ANY);
+
+    const zoneTypes = useMemo(() => distinctStrings(buildings.map((b) => b.zoneType)), [buildings]);
+    const levels = useMemo(() => distinctNumbers(buildings.map((b) => b.level)).map(String), [buildings]);
+    const lotWidths = useMemo(() => distinctNumbers(buildings.map((b) => b.lotWidth)).map(String), [buildings]);
+    const lotDepths = useMemo(() => distinctNumbers(buildings.map((b) => b.lotDepth)).map(String), [buildings]);
+    const assetPacks = useMemo(() => distinctStrings(buildings.flatMap((b) => b.assetPackIds)), [buildings]);
+
+    const filtered = useMemo(() => {
+        const name = nameFilter.trim().toLowerCase();
+        return buildings.filter((b) => {
+            if (name && !b.prefabId.toLowerCase().includes(name)) return false;
+            if (zoneTypeFilter && b.zoneType !== zoneTypeFilter) return false;
+            if (levelFilter && b.level !== Number(levelFilter)) return false;
+            if (lotWidthFilter && b.lotWidth !== Number(lotWidthFilter)) return false;
+            if (lotDepthFilter && b.lotDepth !== Number(lotDepthFilter)) return false;
+            if (assetPackFilter && !b.assetPackIds.includes(assetPackFilter)) return false;
+            return true;
+        });
+    }, [buildings, nameFilter, zoneTypeFilter, levelFilter, lotWidthFilter, lotDepthFilter, assetPackFilter]);
+
+    const clearFilters = () => {
+        setNameFilter("");
+        setZoneTypeFilter(ANY);
+        setLevelFilter(ANY);
+        setLotWidthFilter(ANY);
+        setLotDepthFilter(ANY);
+        setAssetPackFilter(ANY);
+    };
+
     return (
         <Panel
-            header={`Buildings (${buildings.length})`}
-            style={{ position: "absolute", top: "100px", left: "440px", width: "420px" }}
+            header={`Buildings (${filtered.length}/${buildings.length})`}
+            style={{ position: "absolute", top: "100px", left: "440px", width: "480px" }}
         >
-            <Scrollable vertical style={{ maxHeight: "400px" }}>
-                {buildings.map((building) => (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+                <input
+                    value={nameFilter}
+                    onChange={(event) => setNameFilter(event.target.value)}
+                    placeholder="Search name"
+                    style={{ flex: "1 1 140px" }}
+                />
+                <FilterDropdown label="Any zone" options={zoneTypes} value={zoneTypeFilter} onChange={setZoneTypeFilter} />
+                <FilterDropdown label="Any level" options={levels} value={levelFilter} onChange={setLevelFilter} formatOption={(v) => `L${v}`} />
+                <FilterDropdown label="Any width" options={lotWidths} value={lotWidthFilter} onChange={setLotWidthFilter} formatOption={(v) => `${v} wide`} />
+                <FilterDropdown label="Any depth" options={lotDepths} value={lotDepthFilter} onChange={setLotDepthFilter} formatOption={(v) => `${v} deep`} />
+                <FilterDropdown label="Any pack" options={assetPacks} value={assetPackFilter} onChange={setAssetPackFilter} />
+                <Button onSelect={clearFilters}>Clear</Button>
+            </div>
+            <Scrollable vertical style={{ maxHeight: "360px" }}>
+                {filtered.length === 0 && <div>No buildings match.</div>}
+                {filtered.map((building) => (
                     <div
                         key={building.prefabId}
                         style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", fontSize: "12px" }}
@@ -41,3 +149,11 @@ export const BuildingPicker = () => {
         </Panel>
     );
 };
+
+function distinctStrings(values: string[]): string[] {
+    return Array.from(new Set(values)).sort();
+}
+
+function distinctNumbers(values: number[]): number[] {
+    return Array.from(new Set(values)).sort((a, b) => a - b);
+}
