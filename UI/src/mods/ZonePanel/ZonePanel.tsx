@@ -4,6 +4,8 @@ import { useState } from "react";
 import mod from "../../../mod.json";
 import { generateGuid } from "shared/generateGuid";
 import { ANY, FilterDropdown } from "shared/FilterDropdown";
+import { useResizable } from "shared/useResizable";
+import { ResizeHandle } from "shared/ResizeHandle";
 
 interface ZoneEntry {
     id: string;
@@ -42,6 +44,7 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     const zones = useValue(Zones$);
     const [newName, setNewName] = useState("");
     const [newBaseZoneType, setNewBaseZoneType] = useState(ANY);
+    const { size, onHandleMouseDown } = useResizable({ width: 460, height: 400 });
 
     const onCreate = () => {
         const name = newName.trim();
@@ -57,9 +60,11 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
     return (
         <Panel
             header="Zones"
-            style={{ position: "absolute", top: "440px", left: "100px", width: "460px" }}
+            draggable={true}
+            initialPosition={{ x: 100, y: 440 }}
+            style={{ width: `${size.width}px`, height: `${size.height}px`, position: "relative" }}
         >
-            <Scrollable vertical style={{ maxHeight: "300px" }}>
+            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
                 {zones.length === 0 && <div>No zones yet.</div>}
                 {zones.map((zone) => (
                     <div
@@ -90,6 +95,7 @@ export const ZonePanel = ({ onCreated, onEdit }: ZonePanelProps = {}) => {
                 <FilterDropdown label="Base type" options={BASE_ZONE_TYPES} value={newBaseZoneType} onChange={setNewBaseZoneType} />
                 <Button disabled={!newName.trim() || newBaseZoneType === ANY} onSelect={onCreate}>Create</Button>
             </div>
+            <ResizeHandle onMouseDown={onHandleMouseDown} />
         </Panel>
     );
 };

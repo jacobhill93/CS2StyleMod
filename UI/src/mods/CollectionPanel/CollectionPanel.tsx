@@ -3,6 +3,8 @@ import { Button, Panel, Scrollable } from "cs2/ui";
 import { useState } from "react";
 import mod from "../../../mod.json";
 import { generateGuid } from "shared/generateGuid";
+import { useResizable } from "shared/useResizable";
+import { ResizeHandle } from "shared/ResizeHandle";
 
 interface CollectionEntry {
     id: string;
@@ -24,6 +26,7 @@ const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
     const collections = useValue(Collections$);
     const [newName, setNewName] = useState("");
+    const { size, onHandleMouseDown } = useResizable({ width: 360, height: 400 });
 
     const onCreate = () => {
         const name = newName.trim();
@@ -38,9 +41,11 @@ export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
     return (
         <Panel
             header="Collections"
-            style={{ position: "absolute", top: "100px", left: "100px", width: "360px" }}
+            draggable={true}
+            initialPosition={{ x: 100, y: 100 }}
+            style={{ width: `${size.width}px`, height: `${size.height}px`, position: "relative" }}
         >
-            <Scrollable vertical style={{ maxHeight: "300px" }}>
+            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
                 {collections.length === 0 && <div>No collections yet.</div>}
                 {collections.map((collection) => (
                     <div
@@ -67,6 +72,7 @@ export const CollectionPanel = ({ onCreated }: CollectionPanelProps = {}) => {
                 />
                 <Button onSelect={onCreate}>Create</Button>
             </div>
+            <ResizeHandle onMouseDown={onHandleMouseDown} />
         </Panel>
     );
 };

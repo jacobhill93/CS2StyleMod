@@ -1,6 +1,8 @@
 import { bindValue, trigger, useValue } from "cs2/api";
 import { Button, Panel, Scrollable } from "cs2/ui";
 import mod from "../../../mod.json";
+import { useResizable } from "shared/useResizable";
+import { ResizeHandle } from "shared/ResizeHandle";
 
 interface CollectionEntry {
     id: string;
@@ -34,14 +36,17 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
     const zones = useValue(Zones$);
     const zone = zones.find((z) => z.id === zoneId);
     const attachedIds = new Set(zone?.collectionIds ?? []);
+    const { size, onHandleMouseDown } = useResizable({ width: 360, height: 400 });
 
     return (
         <Panel
             header={zone ? `Collections for "${zone.name}"` : "Collections"}
             onClose={onClose}
-            style={{ position: "absolute", top: "440px", left: "480px", width: "360px" }}
+            draggable={true}
+            initialPosition={{ x: 480, y: 440 }}
+            style={{ width: `${size.width}px`, height: `${size.height}px`, position: "relative" }}
         >
-            <Scrollable vertical style={{ maxHeight: "300px" }}>
+            <Scrollable vertical style={{ maxHeight: `${size.height - 140}px` }}>
                 {collections.length === 0 && <div>No collections yet - create one first.</div>}
                 {collections.map((collection) => {
                     const attached = attachedIds.has(collection.id);
@@ -66,6 +71,7 @@ export const ZoneCollectionsPicker = ({ zoneId, onClose }: ZoneCollectionsPicker
                     );
                 })}
             </Scrollable>
+            <ResizeHandle onMouseDown={onHandleMouseDown} />
         </Panel>
     );
 };
