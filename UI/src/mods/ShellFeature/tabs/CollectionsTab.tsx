@@ -6,6 +6,7 @@ import mod from "../../../../mod.json";
 import { generateGuid } from "shared/generateGuid";
 import { Icons } from "shared/icons";
 import rowStyles from "shared/ListRow.module.scss";
+import { BuildingThumbnail } from "shared/BuildingThumbnail";
 
 interface BuildingEntry {
     prefabId: string;
@@ -15,6 +16,7 @@ interface BuildingEntry {
     lotDepth: number;
     heightMeters: number;
     assetPackIds: string[];
+    iconPath: string;
 }
 
 interface CollectionEntry {
@@ -107,7 +109,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
 
     return (
         <>
-            <Scrollable vertical style={{ height: "220px" }}>
+            <Scrollable vertical style={{ height: "280px" }}>
                 {collections.length === 0 && (
                     <div className={rowStyles.emptyState}>
                         No collections yet. Create a reusable group of buildings below, then attach it to a zone.
@@ -121,7 +123,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                     >
                         {confirmingDeleteId === collection.id ? (
                             <>
-                                <span style={{ fontSize: "12px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
+                                <span style={{ fontSize: "13px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
                                     Delete "{collection.name}"? It'll be detached from any zones using it.
                                 </span>
                                 <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
@@ -164,7 +166,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                     />
                     <Button onSelect={onCreate}>Create</Button>
                 </div>
-                {nameError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name required.</span>}
+                {nameError && <span style={{ fontSize: "12px", color: "#ff8080" }}>Name required.</span>}
             </div>
         </>
     );
@@ -185,16 +187,17 @@ const CollectionDetail = ({ collection, buildings, onBack, onAddAssets }: Collec
         <>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                 <Button onSelect={onBack}>Back</Button>
-                <span style={{ fontSize: "13px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "14px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {collection.name}
                 </span>
             </div>
-            <Scrollable vertical style={{ height: "180px" }}>
+            <Scrollable vertical style={{ height: "220px" }}>
                 {members.length === 0 && (
                     <div className={rowStyles.emptyState}>No assets in this collection yet.</div>
                 )}
                 {members.map((building) => (
-                    <div key={building.prefabId} className={rowStyles.row} style={{ fontSize: "12px" }}>
+                    <div key={building.prefabId} className={rowStyles.row}>
+                        <BuildingThumbnail iconPath={building.iconPath} />
                         <span className={rowStyles.primary}>{building.prefabId}</span>
                         <span className={rowStyles.secondary}>
                             {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth}

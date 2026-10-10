@@ -16,8 +16,9 @@ namespace CS2StyleMod.UI
         private readonly int m_LotDepth;
         private readonly float m_HeightMeters;
         private readonly string[] m_AssetPackIds;
+        private readonly string m_IconPath;
 
-        public BuildingPickerEntry(string prefabId, string zoneType, int level, int lotWidth, int lotDepth, float heightMeters, string[] assetPackIds)
+        public BuildingPickerEntry(string prefabId, string zoneType, int level, int lotWidth, int lotDepth, float heightMeters, string[] assetPackIds, string iconPath)
         {
             m_PrefabId = prefabId;
             m_ZoneType = zoneType;
@@ -26,6 +27,7 @@ namespace CS2StyleMod.UI
             m_LotDepth = lotDepth;
             m_HeightMeters = heightMeters;
             m_AssetPackIds = assetPackIds;
+            m_IconPath = iconPath;
         }
 
         public void Write(IJsonWriter writer)
@@ -48,6 +50,8 @@ namespace CS2StyleMod.UI
             foreach (var id in m_AssetPackIds)
                 writer.Write(id);
             writer.ArrayEnd();
+            writer.PropertyName("iconPath");
+            writer.Write(m_IconPath);
             writer.TypeEnd();
         }
     }

@@ -10,7 +10,11 @@
     position: absolute;
     top: 60px;
     right: 10px;
-    width: 420px;
+    // Bumped 420px -> 460px (thumbnail room) -> 560px (2026-10-09, user
+    // feedback after an in-game look: everything felt cramped - search
+    // box, icons, text - and there's no real estate pressure forcing a
+    // narrow panel. Not yet confirmed in-game.
+    width: 560px;
 
     &.fpsLevel1 {
         top: 80px;
@@ -56,7 +60,7 @@
 // in - a likely real contributor to the "drab" look, not just a missing-
 // polish gap.
 .body {
-    min-height: 240px;
-    font-size: 12px;
+    min-height: 320px;
+    font-size: 13px;
     padding: 0 base.$space-md base.$space-md;
 }

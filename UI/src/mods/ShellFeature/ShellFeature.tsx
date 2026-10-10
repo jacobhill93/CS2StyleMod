@@ -3,6 +3,7 @@ import { Button, Panel } from "cs2/ui";
 import { useState } from "react";
 import classNames from "classnames";
 import { fpsMeterLevel$ } from "shared/fpsMeter";
+import { closeShell, shellVisible$ } from "shared/shellVisibility";
 import { ZonesTab } from "./tabs/ZonesTab";
 import { CollectionsTab } from "./tabs/CollectionsTab";
 import { AssetsTab } from "./tabs/AssetsTab";
@@ -35,6 +36,7 @@ export const ShellFeature = () => {
     // it became clear the two views only differed by a few conditional
     // props - not enough to justify a second floating panel.
     const [focusedCollectionId, setFocusedCollectionId] = useState<string | null>(null);
+    const visible = useValue(shellVisible$);
 
     const switchTab = (tab: ShellTab) => {
         setActiveTab(tab);
@@ -54,9 +56,13 @@ export const ShellFeature = () => {
         setActiveTab("collections");
     };
 
+    // After every hook, not before - still mounted (via UniversalModMenuToggle)
+    // even while hidden, so activeTab/focusedCollectionId survive a close/reopen.
+    if (!visible) return null;
+
     return (
         <div className={classNames(styles.shell, styles[`fpsLevel${fpsMeterLevel}`])}>
-            <Panel header={<div className={styles.header}>CS2StyleMod</div>}>
+            <Panel header={<div className={styles.header}>CS2StyleMod</div>} onClose={closeShell}>
                 <div className={styles.tabs}>
                     {TABS.map((tab) => (
                         <Button

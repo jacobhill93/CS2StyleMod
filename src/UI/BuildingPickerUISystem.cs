@@ -40,7 +40,7 @@ namespace CS2StyleMod.UI
 
             var catalog = new GameBuildingCatalog(World);
             var entries = catalog.GetAllBuildings()
-                .Select(b => new BuildingPickerEntry(b.PrefabId, b.ZoneType.ToString(), b.Level, b.LotSize.Width, b.LotSize.Depth, b.HeightMeters, b.AssetPackIds))
+                .Select(b => new BuildingPickerEntry(b.PrefabId, b.ZoneType.ToString(), b.Level, b.LotSize.Width, b.LotSize.Depth, b.HeightMeters, b.AssetPackIds, b.IconPath))
                 .ToArray();
 
             m_Buildings.Value = entries;

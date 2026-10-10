@@ -91,7 +91,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
 
     return (
         <>
-            <Scrollable vertical style={{ height: "220px" }}>
+            <Scrollable vertical style={{ height: "280px" }}>
                 {zones.length === 0 && (
                     <div className={rowStyles.emptyState}>
                         No zones yet. Create one below and attach collections to define which buildings it offers.
@@ -105,7 +105,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                     >
                         {confirmingDeleteId === zone.id ? (
                             <>
-                                <span style={{ fontSize: "12px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
+                                <span style={{ fontSize: "13px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
                                     Delete "{zone.name}"? Its collections remain available for other zones.
                                 </span>
                                 <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
@@ -157,7 +157,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                     />
                     <Button onSelect={onCreate}>Create</Button>
                 </div>
-                {createError && <span style={{ fontSize: "11px", color: "#ff8080" }}>Name and base type are both required.</span>}
+                {createError && <span style={{ fontSize: "12px", color: "#ff8080" }}>Name and base type are both required.</span>}
             </div>
         </>
     );
@@ -195,11 +195,11 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
         <>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                 <Button onSelect={onBack}>Back</Button>
-                <span style={{ fontSize: "13px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: "14px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {zone.name}
                 </span>
             </div>
-            <Scrollable vertical style={{ height: "180px" }}>
+            <Scrollable vertical style={{ height: "220px" }}>
                 {attached.length === 0 && (
                     <div className={rowStyles.emptyState}>No collections attached yet.</div>
                 )}

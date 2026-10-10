@@ -1,0 +1,24 @@
+// Phase 4c (UI_OVERHAUL_PLAN.md): fixed-size slot so rows stay aligned
+// whether or not a given building actually has an icon - iconPath is
+// empty for most buildings unless Asset Icon Library is installed and
+// covers that prefab (see shared/useBuildingFilters.ts's BuildingEntry
+// comment), so a visible placeholder (not a broken <img> or a layout
+// shift) is the expected common case, not an edge case.
+.thumbnail,
+.placeholder {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 4px;
+}
+
+.thumbnail {
+    object-fit: cover;
+}
+
+.placeholder {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-style: solid;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.12);
+}

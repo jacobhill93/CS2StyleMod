@@ -9,6 +9,11 @@ export interface BuildingEntry {
     lotDepth: number;
     heightMeters: number;
     assetPackIds: string[];
+    // UIObject.m_Icon, empty string if unset - see GameBuildingCatalog.cs
+    // (ResolveIconPath) for the full story. Empty means "no icon
+    // available" (no Asset Icon Library installed, or it doesn't cover
+    // this prefab) - render nothing, not a broken <img>, when empty.
+    iconPath: string;
 }
 
 // Shared by the Phase 4 asset-picker dialog and the Phase 4b standalone

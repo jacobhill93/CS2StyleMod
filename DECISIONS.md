@@ -2,6 +2,107 @@
 
 ## Decisions
 
+### UniversalModMenu dock icon comes from the Paradox Mods publish listing, not mod code (2026-10-09)
+Resolved the open question from the probe entry below (what controls the
+dock icon shown next to a mod's `UniversalModMenu` entry) with direct
+filesystem evidence, not more theorizing. Paradox's subscription cache
+is `Cities Skylines II\.cache\Mods\mods_subscribed\<id>_<version>\` -
+Node Controller (a real installed mod showing a distinct "NC" icon in
+the dock) lives there with a `.metadata\metadata.json` containing
+`displayName`, a `displayImagePath` (a published-store cover image URL),
+author, description - all pulled from its Paradox Mods store listing at
+subscribe time. No `mod.json` and no small/square icon file exists
+anywhere in its installed folder.
+
+Decisively confirmed by the *mismatch* between the two mods: Node
+Controller's own shipped `NodeController.mjs` (decompiled and grepped
+directly) never calls `moduleRegistry.append('UniversalModMenu', ...)`
+at all - yet it still gets a custom dock icon. Our mod DOES call that
+append (`UniversalModMenuToggle`, see the probe entry below) and still
+shows the generic icon. The icon clearly isn't sourced from the
+component registered on the hook at all. `.cache\Mods\local\` (where an
+unpublished local dev mod would be tracked) is completely empty - no
+metadata, no cover image, for any local mod.
+
+**Conclusion**: a locally-built, unpublished mod (our current state)
+cannot show a custom `UniversalModMenu` dock icon through any code-side
+mechanism - confirmed, not just theorized. It's tied entirely to the
+Paradox Mods publish/subscribe pipeline (the `Properties/Thumbnail.png`
+this mod already has, referenced by `PublishConfiguration.xml`, is the
+right asset for this - just untestable locally short of an actual
+publish, even a private one).
+
+### UniversalModMenu probed in-game: too small to host the real shell (2026-10-09)
+Tried the native `'UniversalModMenu'` append hook (confirmed real: present
+in our own `UI/types/modding.d.ts`'s `AppendHookTargets` union, and
+documented at cs2.paradoxwikis.com/UI_Modding as "a single organized,
+scrollable panel") as a possible native open/close mechanism for the
+whole shell, since neither Road Builder nor Find It use it (checked
+directly) and the docs don't specify sizing/layout. Registered a
+deliberately plain probe component (`UniversalModMenuProbe.tsx`, no
+Panel wrapper, no fixed width) alongside - not replacing -
+`ShellFeature`'s existing `'Game'` append, specifically to observe the
+real contract before committing anything to it.
+
+**Confirmed in-game**: a mod icon appears in a bottom-right dock
+alongside several *other* already-installed mods' icons (so the hook
+does have real adoption - just not from the two mods researched
+directly) - default/generic icon since `mod.json` has no icon field and
+no `Thumbnail.png` exists on disk yet. Clicking it expands content in
+that same bottom-right corner, in a genuinely small fixed box - small
+enough that two plain sentences of unstyled text needed their own
+internal scrollbar to read in full. The "scrollable panel" the wiki
+describes is real, but it's a compact widget tray, not meaningful real
+estate - nowhere near enough for `ShellFeature`'s tabs/filters/lists.
+
+**Conclusion**: don't migrate `ShellFeature`'s actual content onto this
+hook. Worth revisiting only as a *trigger* (a small "open CS2StyleMod"
+entry that toggles the real panel's visibility elsewhere), not as the
+container for it - see the open question below for what that would
+need.
+
+### Phase 4c implemented: Asset Icon Library writes directly into UIObject.m_Icon (2026-10-09)
+Follow-up to the research entry below, which concluded `UIObject.m_Icon`
+was the wrong data for per-building thumbnails and flipped Phase 4c's
+preference to Asset Icon Library (AIL). Before implementing an AIL-
+specific integration (`.ail` files or a `GetIconsMap` hook), read AIL's
+actual source directly (`IconReplacerSystem.cs`,
+`Utilities/IconLibraryUtil.cs`, `Utilities/IconAPIUtil.cs`, fetched and
+read raw from GitHub, not inferred from its README) to confirm what it
+actually does with the icons it resolves.
+
+Finding: AIL doesn't just expose its icon map for other mods to query -
+it writes its resolved URL straight into `UIObject.m_Icon` on every
+building prefab it covers (`IconReplacerSystem.cs`:
+`uIObject.m_Icon = thumbnail;`). The URL is a real `coui://ail/<path>`
+(confirmed in `IconLibraryUtil.GetAvailableIcons()`'s `addIconName`
+local function), built from three sources that all funnel into the same
+field: `.ail`/`ail` mod folders, `.ail` JSON map files, and reflection-
+based calls into every other loaded mod's `IMod` class looking for
+`GetIconsMap()`/`GetIconsRootFolders()` (`IconAPIUtil.LoadModIcons()`).
+
+This means the originally-ruled-out approach - just read
+`UIObject.m_Icon` - was actually correct, for a reason the first
+research pass couldn't have known without reading AIL's own code: it's
+not static vanilla data, it's a field AIL actively populates at runtime
+if installed. No `GetIconsMap`/`.ail` integration needed on this mod's
+side - just read the same field `ZonePrefabCloner` already reads/writes
+`m_Group` on. Implemented as `GameBuildingCatalog.ResolveIconPath`,
+threaded through to the UI as `BuildingEntry.iconPath`, rendered via
+`shared/BuildingThumbnail.tsx` (placeholder box when empty - most
+buildings will have no icon unless AIL is installed and covers that
+specific prefab).
+
+**Open, unverified risk**: `BuildingPickerUISystem.OnGameLoaded` reads
+`m_Icon` exactly once. If AIL's own icon-population pass runs *after*
+that point (mod execution order between two independent mods isn't
+something this mod controls, and wasn't checked), every `iconPath` would
+be permanently empty despite AIL being installed - a stale-read bug, not
+a wrong-data bug. Needs an in-game check with AIL actually installed
+before trusting this works end to end. If it turns out stale, the right
+fix is almost certainly moving the read to a later/re-triggerable point
+in this mod's own lifecycle, not switching icon sources again.
+
 ### Phase 4c research: per-building thumbnails are a runtime render, not a static field (2026-10-09)
 UI_OVERHAUL_PLAN.md's Phase 4c had two candidate approaches for asset
 thumbnails, "read the prefab's own icon path" listed as preferred over

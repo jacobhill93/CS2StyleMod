@@ -158,7 +158,8 @@ namespace CS2StyleMod.CustomZones.GameAdapters
                         candidate.Level,
                         candidate.LotSize,
                         heightMeters,
-                        ResolveAssetPackIds(buildingEntity, candidate.PrefabId)));
+                        ResolveAssetPackIds(buildingEntity, candidate.PrefabId),
+                        ResolveIconPath(buildingEntity)));
                 }
             }
             finally
@@ -215,6 +216,32 @@ namespace CS2StyleMod.CustomZones.GameAdapters
                 return new[] { "Vanilla (Europe)" };
 
             return new[] { "Vanilla" };
+        }
+
+        // Phase 4c (UI_OVERHAUL_PLAN.md): UIObject.m_Icon, confirmed real via
+        // live reflection against Game.dll (same field ZonePrefabCloner
+        // already reads/writes m_Group on) and empty by default for most
+        // buildings in vanilla - it's a zone/category icon slot, not a
+        // per-building one, normally. Asset Icon Library (MIT, if the
+        // player has it installed) writes a real coui://ail/... thumbnail
+        // URL into this exact field per building it covers (confirmed by
+        // reading AIL's own IconReplacerSystem.cs source directly - see
+        // DECISIONS.md). Known open risk, not yet confirmed in-game: this
+        // is read once, in BuildingPickerUISystem.OnGameLoaded - if AIL
+        // populates m_Icon *after* that point (mod load/update order
+        // between two independent mods isn't something this mod controls),
+        // the read here would be stale. Needs an in-game check with AIL
+        // actually installed before trusting this works end to end.
+        private string ResolveIconPath(Entity buildingEntity)
+        {
+            if (m_PrefabSystem.TryGetPrefab<BuildingPrefab>(buildingEntity, out var prefab) &&
+                prefab.TryGet<UIObject>(out var uiObject) &&
+                !string.IsNullOrEmpty(uiObject.m_Icon))
+            {
+                return uiObject.m_Icon;
+            }
+
+            return string.Empty;
         }
 
         // Not part of IBuildingCatalog. Used by CustomZoneBuilder's rebuild

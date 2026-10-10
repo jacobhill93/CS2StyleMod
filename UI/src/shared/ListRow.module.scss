@@ -11,8 +11,12 @@
 .row {
     display: flex;
     align-items: center;
-    gap: base.$space-sm;
-    padding: base.$space-sm base.$space-xs;
+    // Bumped (2026-10-09, user feedback after an in-game look: everything
+    // felt cramped) from $space-sm/$space-xs gap/padding - more breathing
+    // room per row now that the panel itself has room to give.
+    gap: base.$space-md;
+    padding: base.$space-md base.$space-sm;
+    font-size: 13px;
     border-bottom-style: solid;
     border-bottom-width: 1px;
     border-bottom-color: rgba(255, 255, 255, 0.08);
@@ -47,12 +51,12 @@
 
 .actions {
     display: flex;
-    gap: base.$space-sm;
+    gap: base.$space-md;
     flex-shrink: 0;
 }
 
 .emptyState {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--textColorDim);
-    padding: base.$space-sm base.$space-xs;
+    padding: base.$space-md base.$space-sm;
 }

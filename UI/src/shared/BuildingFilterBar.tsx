@@ -6,12 +6,12 @@ import { useBuildingFilters } from "shared/useBuildingFilters";
 // picker dialog and the Phase 4b Assets tab render an identical filter
 // row, not two hand-copied versions of the same markup.
 export const BuildingFilterBar = (filters: ReturnType<typeof useBuildingFilters>) => (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginBottom: "8px" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "8px" }}>
         <input
             value={filters.nameFilter}
             onChange={(event) => filters.setNameFilter(event.target.value)}
             placeholder="Search name"
-            style={{ flex: "1 1 140px" }}
+            style={{ flex: "1 1 220px", padding: "6px 8px", fontSize: "13px" }}
         />
         <FilterDropdown label="Any zone" options={filters.zoneTypes} value={filters.zoneTypeFilter} onChange={filters.setZoneTypeFilter} />
         <FilterDropdown label="Any level" options={filters.levels} value={filters.levelFilter} onChange={filters.setLevelFilter} formatOption={(v) => `L${v}`} />

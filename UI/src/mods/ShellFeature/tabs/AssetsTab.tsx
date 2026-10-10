@@ -6,6 +6,7 @@ import { Icons } from "shared/icons";
 import { BuildingEntry, useBuildingFilters } from "shared/useBuildingFilters";
 import { BuildingFilterBar } from "shared/BuildingFilterBar";
 import rowStyles from "shared/ListRow.module.scss";
+import { BuildingThumbnail } from "shared/BuildingThumbnail";
 
 interface CollectionEntry {
     id: string;
@@ -61,14 +62,14 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
             {pickingForCollectionId && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                     <Button onSelect={onDonePicking}>Done</Button>
-                    <span style={{ fontSize: "13px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "14px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         Adding to "{pickingCollection?.name ?? ""}"
                     </span>
                 </div>
             )}
             <BuildingFilterBar {...filters} />
             <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "12px", opacity: 0.8 }}>
+                <span style={{ fontSize: "13px", opacity: 0.8 }}>
                     {filtered.length}/{buildings.length} shown
                 </span>
                 {pickingForCollectionId && (
@@ -78,7 +79,7 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
                     </>
                 )}
             </div>
-            <Scrollable vertical style={{ height: "280px" }}>
+            <Scrollable vertical style={{ height: "340px" }}>
                 {filtered.length === 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                         <span className={rowStyles.emptyState}>No buildings match. Try a different search or filter.</span>
@@ -88,7 +89,8 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
                 {filtered.map((building) => {
                     const alreadyAdded = memberPrefabIds.has(building.prefabId);
                     return (
-                        <div key={building.prefabId} className={rowStyles.row} style={{ fontSize: "12px" }}>
+                        <div key={building.prefabId} className={rowStyles.row}>
+                            <BuildingThumbnail iconPath={building.iconPath} />
                             <span className={rowStyles.primary}>{building.prefabId}</span>
                             <span className={rowStyles.secondary}>
                                 {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]

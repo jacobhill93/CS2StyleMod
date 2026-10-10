@@ -244,37 +244,50 @@ project makes) - the original preference order was wrong, and reversed:**
   something cohtml's `coui://` scheme can serve, none of which this
   session has verified end-to-end.
 
-**Revised order:**
+**Implemented (2026-10-09), not yet confirmed in-game - second research
+pass flipped the approach again:** reading AIL's own actual source
+(`IconReplacerSystem.cs`, fetched and read directly, not guessed from
+the README) showed it doesn't just expose a map for other mods to query
+- it **writes its resolved thumbnail URL directly into
+`UIObject.m_Icon`** on every building prefab it covers
+(`uIObject.m_Icon = thumbnail;`). That URL is the real
+`coui://ail/<path>` scheme, built by `IconLibraryUtil.GetAvailableIcons()`
+from `.ail`/`ail` mod folders, `.ail` JSON map files, *and* reflection-
+based `GetIconsMap()`/`GetIconsRootFolders()` calls into every other
+loaded mod's `IMod`-implementing class (`IconAPIUtil.LoadModIcons()`) -
+all three of the README's integration paths funnel into the same field.
 
-1. **Asset Icon Library (AIL)** (github.com/JadHajjar/AssetIconLibrary-
-   CSII, MIT, same author as Find It/Road Builder - already researched
-   this session, see the icon-library research entry in `DECISIONS.md`)
-   is now the lead option, not the fallback - it already solved the
-   runtime-thumbnail problem (the exact thing `ThumbnailCache` above
-   represents the hard part of) so this mod doesn't have to reimplement
-   Unity Camera-based rendering from scratch. Two real integration
-   mechanisms confirmed: `coui://ail/<path>` URLs from `.ail` JSON
-   mapping files, or a `GetIconsMap(string style)` static hook a
-   consuming mod implements on its own `IMod` class that AIL calls
-   reflectively. Depends on AIL being installed and its map actually
-   covering the specific assets a player has - needs a visible
-   placeholder (not a broken image) for prefabs it doesn't cover.
-2. **Render thumbnails ourselves via `ThumbnailCache`** - only worth
-   attempting if AIL's coverage proves too gappy in practice. Real but
-   unverified beyond the method signature: would need its own research
-   pass (how `GetThumbnail`'s `Camera`/`Object` args are actually
-   obtained for a given prefab entity, and how the resulting texture
-   reaches the UI layer) before any implementation attempt - don't guess
-   at this API from a method signature alone.
-3. ~~Read `UIObject.m_Icon` directly~~ - ruled out: real field, wrong
-   data (zone-level icon, not per-building), doesn't solve the actual
-   problem.
+So the originally-ruled-out "read `UIObject.m_Icon` directly" option was
+right after all, just for the wrong reason the first time: vanilla
+leaves it empty per-building, but **AIL (if installed) populates it for
+us** - no `GetIconsMap`/`.ail` integration needed on this mod's side at
+all, just read the field AIL already writes into. Implemented as
+`GameBuildingCatalog.ResolveIconPath` (same `prefab.TryGet<UIObject>`
+pattern `ZonePrefabCloner` already uses for `m_Group`), threaded through
+`BuildingBrowserEntry`/`BuildingPickerEntry`/the `Buildings` binding as
+`iconPath`, rendered via a new `shared/BuildingThumbnail.tsx` (visible
+placeholder box when empty, never a broken `<img>`) in the Assets tab
+and the Collection detail's membership list.
 
-Confirm in-game: thumbnails actually render for a representative mix of
-vanilla, DLC, and (if available) Workshop buildings - not just the first
-few rows, since a partial-coverage icon source would need a visible
-fallback (blank/placeholder, not a broken image) for prefabs it can't
-resolve.
+**One real, unverified risk**: `BuildingPickerUISystem` reads this once,
+in `OnGameLoaded`, and never again. If AIL populates `m_Icon` *after*
+that point - mod load/update order between two independently-installed
+mods isn't something this mod controls - the read would be stale
+(permanently empty icons despite AIL being installed). Confirm in-game
+with AIL actually installed: do thumbnails show up at all, for a
+representative mix of vanilla/DLC/Workshop buildings (not just the
+first few rows)? If they don't, the fix is almost certainly a later or
+re-triggerable read point, not a different icon source - don't build
+that speculatively before confirming the simple version is actually
+insufficient.
+
+Fallback, only if AIL doesn't pan out: `Game.UI.Thumbnails.ThumbnailCache
+.GetThumbnail(Object obj, int width, int height, Camera camera)` - a
+genuine runtime 3D render, confirmed real via the same reflection pass
+but never pursued further (needs a render target, a camera, and a
+texture handoff into cohtml's `coui://` scheme, none of which is
+verified end-to-end) - would need its own dedicated research pass before
+any implementation attempt.
 
 ### Phase 5 - Loading, error, and validation states
 
