@@ -168,15 +168,23 @@ threaded through to the UI as `BuildingEntry.iconPath`, rendered via
 buildings will have no icon unless AIL is installed and covers that
 specific prefab).
 
-**Open, unverified risk**: `BuildingPickerUISystem.OnGameLoaded` reads
-`m_Icon` exactly once. If AIL's own icon-population pass runs *after*
-that point (mod execution order between two independent mods isn't
-something this mod controls, and wasn't checked), every `iconPath` would
-be permanently empty despite AIL being installed - a stale-read bug, not
-a wrong-data bug. Needs an in-game check with AIL actually installed
-before trusting this works end to end. If it turns out stale, the right
-fix is almost certainly moving the read to a later/re-triggerable point
-in this mod's own lifecycle, not switching icon sources again.
+**Risk resolved (2026-10-12), confirmed in-game with AIL actually
+installed**: `BuildingPickerUISystem.OnGameLoaded` reads `m_Icon` exactly
+once, and the worry was that AIL's own icon-population pass might run
+*after* that point (mod execution order between two independent mods
+isn't something this mod controls) - meaning every `iconPath` would come
+back permanently empty despite AIL being installed. Not the case: user
+confirmed most buildings show real AIL thumbnails. AIL's write clearly
+lands before our one-time read, at least for the buildings it covers -
+no need for a later/re-triggerable read point.
+
+One real, separate gap found via the same report: NA Old Town assets
+specifically show no icon (placeholder only) while most other buildings
+do. Root cause is almost certainly **AIL's own coverage**, not anything
+on this mod's side - AIL's icon database is pre-rendered/community-
+contributed sets that can simply lag behind a newer or less common
+theme/asset pack. Nothing to fix here; this is the expected "AIL doesn't
+cover everything" case the placeholder design already accounts for.
 
 ### Phase 4c research: per-building thumbnails are a runtime render, not a static field (2026-10-09)
 UI_OVERHAUL_PLAN.md's Phase 4c had two candidate approaches for asset

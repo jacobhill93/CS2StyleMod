@@ -281,17 +281,16 @@ pattern `ZonePrefabCloner` already uses for `m_Group`), threaded through
 placeholder box when empty, never a broken `<img>`) in the Assets tab
 and the Collection detail's membership list.
 
-**One real, unverified risk**: `BuildingPickerUISystem` reads this once,
-in `OnGameLoaded`, and never again. If AIL populates `m_Icon` *after*
-that point - mod load/update order between two independently-installed
-mods isn't something this mod controls - the read would be stale
-(permanently empty icons despite AIL being installed). Confirm in-game
-with AIL actually installed: do thumbnails show up at all, for a
-representative mix of vanilla/DLC/Workshop buildings (not just the
-first few rows)? If they don't, the fix is almost certainly a later or
-re-triggerable read point, not a different icon source - don't build
-that speculatively before confirming the simple version is actually
-insufficient.
+**Risk resolved, confirmed in-game with AIL actually installed
+(2026-10-12)**: `BuildingPickerUISystem` reads `m_Icon` once, in
+`OnGameLoaded` - the worry was AIL populating it *after* that point
+(mod load order between two independent mods isn't controlled), leaving
+every icon permanently empty. Not the case - most buildings show real
+AIL thumbnails. One real, separate gap: NA Old Town assets specifically
+show no icon - believed to be AIL's own coverage gap for that pack
+(newer/less common asset packs can lag behind in AIL's icon database),
+not a timing issue, since unrelated buildings work fine. See
+DECISIONS.md.
 
 Fallback, only if AIL doesn't pan out: `Game.UI.Thumbnails.ThumbnailCache
 .GetThumbnail(Object obj, int width, int height, Camera camera)` - a
