@@ -7,6 +7,14 @@ import { BuildingEntry, useBuildingFilters } from "shared/useBuildingFilters";
 import { BuildingFilterBar } from "shared/BuildingFilterBar";
 import rowStyles from "shared/ListRow.module.scss";
 import { BuildingThumbnail } from "shared/BuildingThumbnail";
+import { useVirtualizedRows } from "shared/useVirtualizedRows";
+
+// Must match the real rendered row height: ListRow.module.scss's .row
+// padding (8px top + 8px bottom = base.$space-md each) plus
+// BuildingThumbnail's 48px size = 64px. Kept in sync by hand, not
+// measured - see useVirtualizedRows.ts's own comment for why.
+const ROW_HEIGHT = 64;
+const LIST_VIEWPORT_HEIGHT = 340;
 
 interface CollectionEntry {
     id: string;
@@ -42,6 +50,13 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
         ? collections.find((c) => c.id === pickingForCollectionId)
         : undefined;
     const memberPrefabIds = useMemo(() => new Set(pickingCollection?.prefabIds ?? []), [pickingCollection]);
+
+    const { scrollRef, onScroll, startIndex, endIndex, totalHeight } = useVirtualizedRows({
+        itemCount: filtered.length,
+        rowHeight: ROW_HEIGHT,
+        viewportHeight: LIST_VIEWPORT_HEIGHT,
+    });
+    const visibleRows = filtered.slice(startIndex, endIndex);
 
     const onSelectAllFiltered = () => {
         if (!pickingForCollectionId) return;
@@ -79,37 +94,46 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
                     </>
                 )}
             </div>
-            <Scrollable vertical style={{ height: "340px" }}>
+            <Scrollable vertical ref={scrollRef} onScroll={onScroll} style={{ height: `${LIST_VIEWPORT_HEIGHT}px` }}>
                 {filtered.length === 0 && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                         <span className={rowStyles.emptyState}>No buildings match. Try a different search or filter.</span>
                         <Button onSelect={filters.clearFilters}>Clear filters</Button>
                     </div>
                 )}
-                {filtered.map((building) => {
-                    const alreadyAdded = memberPrefabIds.has(building.prefabId);
-                    return (
-                        <div key={building.prefabId} className={rowStyles.row}>
-                            <BuildingThumbnail iconPath={building.iconPath} />
-                            <span className={rowStyles.primary}>{building.prefabId}</span>
-                            <span className={rowStyles.secondary}>
-                                {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]
-                            </span>
-                            {pickingForCollectionId && (
-                                <Button
-                                    variant="icon"
-                                    style={{ flexShrink: 0 }}
-                                    src={alreadyAdded ? Icons.trash : Icons.plus}
-                                    tooltipLabel={alreadyAdded ? "Remove" : "Add"}
-                                    selected={alreadyAdded}
-                                    onSelect={() =>
-                                        trigger(mod.id, alreadyAdded ? "RemoveBuildingFromCollection" : "AddBuildingToCollection", pickingForCollectionId, building.prefabId)
-                                    }
-                                />
-                            )}
-                        </div>
-                    );
-                })}
+                {filtered.length > 0 && (
+                    <div style={{ position: "relative", height: `${totalHeight}px` }}>
+                        {visibleRows.map((building, i) => {
+                            const alreadyAdded = memberPrefabIds.has(building.prefabId);
+                            const top = (startIndex + i) * ROW_HEIGHT;
+                            return (
+                                <div
+                                    key={building.prefabId}
+                                    className={rowStyles.row}
+                                    style={{ position: "absolute", top: `${top}px`, left: 0, right: 0, boxSizing: "border-box" }}
+                                >
+                                    <BuildingThumbnail iconPath={building.iconPath} />
+                                    <span className={rowStyles.primary}>{building.prefabId}</span>
+                                    <span className={rowStyles.secondary}>
+                                        {building.zoneType} L{building.level} {building.lotWidth}x{building.lotDepth} [{building.assetPackIds.join(", ")}]
+                                    </span>
+                                    {pickingForCollectionId && (
+                                        <Button
+                                            variant="icon"
+                                            style={{ flexShrink: 0 }}
+                                            src={alreadyAdded ? Icons.trash : Icons.plus}
+                                            tooltipLabel={alreadyAdded ? "Remove" : "Add"}
+                                            selected={alreadyAdded}
+                                            onSelect={() =>
+                                                trigger(mod.id, alreadyAdded ? "RemoveBuildingFromCollection" : "AddBuildingToCollection", pickingForCollectionId, building.prefabId)
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </Scrollable>
         </>
     );

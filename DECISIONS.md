@@ -2,6 +2,34 @@
 
 ## Decisions
 
+### Assets tab virtualization, second attempt: plain ref + onScroll, no ScrollController (2026-10-11)
+Follow-up to the entry below (first attempt crashed the whole HUD).
+Research pass found no real CS2 mod constructs `ScrollController`
+directly - Find It (a real asset browser with potentially thousands of
+items) does its virtualization entirely server-side instead: C# tracks
+a `ScrollIndex`, only sends the currently-visible data slice through the
+binding, and the UI hand-rolls its own wheel/scrollbar-thumb interaction
+calling a `SetScrollIndex` trigger back into C# - no `cs2/ui` `Scrollable`
+or `ScrollController` involved at all. That's the proven pattern, but a
+real rearchitecture (move filtering server-side, new binding/trigger,
+custom scroll UI) - user chose a smaller, lower-risk experiment instead
+("can't hurt"): rewrote `useVirtualizedRows.ts` to avoid `ScrollController`
+entirely.
+
+New approach: `Scrollable` forwards a plain ref to its underlying
+`HTMLDivElement` (confirmed via its own `RefAttributes<HTMLDivElement>`
+type) - attach a ref, read `.scrollTop` from it inside the existing
+`onScroll` callback prop (an ordinary `() => void` callback, not a class
+with its own construction/attachment lifecycle). Both are standard React
+patterns, not SDK-specific machinery, which is the actual risk being
+managed here, not just "does it work." If `onScroll` turns out not to
+fire for some reason in this engine, the degraded behavior is the list
+always showing its top slice while scrolling - a visible bug, not a
+crash.
+
+**Confirmed working in-game**: no crash, smooth scrolling through the
+full unfiltered ~3962-row list, correct rows shown throughout.
+
 ### Assets tab list virtualization attempt - reverted, broke the whole HUD (2026-10-11)
 User reported the Assets tab was "super laggy" - root cause diagnosed
 correctly: with no filter applied it renders up to ~3962 rows into the
