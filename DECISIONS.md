@@ -2,6 +2,47 @@
 
 ## Decisions
 
+### Three polish items from a Road Builder compare/contrast (2026-10-12)
+Did a code-level comparison against Road Builder's real shipped source
+(already fetched/read this session) to find concrete, low-risk ways to
+close the "looks drab" gap, rather than more speculative styling.
+Implemented the three cheapest, lowest-risk findings:
+
+1. **Entry animation** - the shell previously just snapped into
+   existence on open (conditional render, no transition). Added a
+   slide+fade `@keyframes shellEntry` on `.shell`, directly matching
+   Road Builder's real `SidePanel.module.scss` `@keyframes entry`
+   (`opacity: 0 -> 1`, slides in from `right: -10px`). Replays every
+   open/close since the whole `.shell` div is freshly mounted each time
+   (`shared/shellVisibility.ts`'s conditional render), not just once.
+2. **Built-in game icons, not a third-party dependency** -
+   `shared/icons.ts` previously sourced Plus/Trash/Pencil from Unified
+   Icon Library (`coui://uil/...`), optional and silently absent if not
+   installed. Switched to the game's own built-in assets
+   (`Media/Glyphs/Plus.svg`, `Media/Glyphs/Trash.svg`,
+   `Media/Editor/Edit.svg`) referenced by plain relative path, zero
+   `coui://` scheme - confirmed two ways: the paths actually exist on
+   disk in the installed game's `Content/Game/UI/Media/` folder, and
+   Road Builder's real source uses this exact relative-path technique
+   (`<img src="Media/Tools/Snap Options/All.svg" />`, read directly
+   earlier this session) rather than any custom scheme, which works
+   because mod panels render into the same document as the vanilla
+   game UI. UIL is no longer referenced anywhere in this mod - removed
+   from README's dependency table.
+3. **Custom tab-selected/hover styling** - cs2/ui's `Button` `selected`
+   prop styling is a black box (only its type declarations are visible,
+   not its real implementation), so rather than guess at overriding it,
+   layered our own conditional `className` on top instead - the same
+   technique Road Builder's real `.mode` buttons use
+   (`classNames(selectedCategory == x && styles.selected)` in their own
+   source), with `!important` since this sits over the library's own
+   rules, not replacing them. `ShellFeature`'s tab buttons now also get
+   `styles.tabButton`/`styles.tabButtonSelected`, using
+   `var(--accentColorDark)` for the selected state (same token Road
+   Builder's own selected-state styling uses).
+
+Not yet confirmed in-game.
+
 ### Assets tab virtualization, second attempt: plain ref + onScroll, no ScrollController (2026-10-11)
 Follow-up to the entry below (first attempt crashed the whole HUD).
 Research pass found no real CS2 mod constructs `ScrollController`

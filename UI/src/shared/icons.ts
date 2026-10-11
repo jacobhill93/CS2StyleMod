@@ -1,23 +1,22 @@
-// Unified Icon Library (github.com/algernon-A/UnifiedIconLibrary,
-// Apache-2.0) - referenced by URL at runtime, nothing copied/bundled.
-// Purely optional: the mod "doesn't do anything unless you have a mod
-// that uses it" (its own README) - if a player doesn't have UIL
-// installed, these coui:// paths 404 silently and cs2/ui's Button just
-// renders its text label with no icon. No dependency declaration is
-// needed for this to work - confirmed via other mods' actual deployed
-// output that this is a plain runtime URL reference, not an API call.
+// Built-in game icons (2026-10-12), replacing the earlier Unified Icon
+// Library (UIL)-sourced versions - zero dependency, always present,
+// same approach Road Builder's real shipped source uses
+// (`<img src="Media/Tools/Snap Options/All.svg" />`, fetched and read
+// directly this session): a plain relative path, no coui:// scheme.
+// Works because mod panels render into the same document as the
+// vanilla game UI (confirmed via this project's own earlier findings -
+// the shared 'Game' render root with no error boundary), so a relative
+// URL resolves against the game's own UI bundle root
+// (Content/Game/UI/), not anything mod-specific.
 //
-// Only icon names actually confirmed to exist in UIL's real catalog are
-// used here (via GitHub tree listing, not guessed) - an unconfirmed name
-// would just 404 into a blank icon slot, worse than no icon at all.
-const UIL_STYLE = "Standard";
-
-function uilIcon(name: string): string {
-    return `coui://uil/${UIL_STYLE}/${name}.svg`;
-}
-
+// Paths confirmed to exist by listing the actual installed game's
+// Content/Game/UI/Media folder, not guessed - same discipline as every
+// other game-file-dependent claim this project makes:
+//   Media/Glyphs/Plus.svg
+//   Media/Glyphs/Trash.svg
+//   Media/Editor/Edit.svg
 export const Icons = {
-    plus: uilIcon("Plus"),
-    trash: uilIcon("Trash"),
-    pencil: uilIcon("Pencil"),
+    plus: "Media/Glyphs/Plus.svg",
+    trash: "Media/Glyphs/Trash.svg",
+    pencil: "Media/Editor/Edit.svg",
 };

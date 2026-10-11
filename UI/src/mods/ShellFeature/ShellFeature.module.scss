@@ -14,6 +14,12 @@
     // 2026-10-11, user feedback in-game: still room to spare, wanted the
     // building thumbnails more visible).
     width: 840px;
+    // Slide-in + fade, matching Road Builder's real shipped panel entry
+    // (SidePanel.module.scss's @keyframes entry, confirmed via direct
+    // source read). Replays every time the shell is shown, not just
+    // once - it's conditionally rendered (shared/shellVisibility.ts),
+    // so the whole .shell div is freshly mounted on each open.
+    animation: shellEntry 0.2s ease-out;
 
     &.fpsLevel1 {
         top: 80px;
@@ -25,6 +31,16 @@
 
     &.fpsLevel3 {
         top: 160px;
+    }
+}
+
+@keyframes shellEntry {
+    0% {
+        opacity: 0;
+        right: -10px;
+    }
+    100% {
+        opacity: 1;
     }
 }
 
@@ -50,6 +66,30 @@
     gap: base.$space-sm;
     margin-bottom: base.$space-md;
     padding: base.$space-sm base.$space-md 0;
+}
+
+// Custom selected/hover treatment layered on top of cs2/ui's own Button,
+// not an attempt to override its internal selected-state styling (its
+// real implementation isn't visible to us, just its type declarations) -
+// same technique Road Builder's real shipped SidePanel.module.scss uses
+// for its own mode-toggle buttons (confirmed via direct source read):
+// a plain conditional className driven by our own React state, with
+// !important since it's layered over the library's own rules, not
+// replacing them.
+.tabButton {
+    @include base.interactive-transition(background-color);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+    }
+}
+
+.tabButtonSelected {
+    background-color: var(--accentColorDark) !important;
+
+    &:hover {
+        background-color: var(--accentColorDark) !important;
+    }
 }
 
 // Phase 6: dropped the blanket opacity:0.8 this had in Phase 1 - that
