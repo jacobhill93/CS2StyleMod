@@ -102,5 +102,68 @@ namespace CS2StyleMod.Core.Tests
             Assert.False(found);
             Assert.Null(collection);
         }
+
+        [Fact]
+        public void FailedSaveOfANewCollectionRollsBackInMemoryState()
+        {
+            // Pointed at a directory, not a file - WriteToDisk's
+            // File.Delete(m_FilePath) step reliably fails (you can't
+            // delete a directory via File.Delete), a deterministic way to
+            // simulate a real write failure (disk full, file locked,
+            // permissions denied) without racy file-attribute timing.
+            var library = new JsonFileCollectionLibrary(Path.GetTempPath());
+            var collection = new Collection("Will Not Persist");
+
+            Assert.ThrowsAny<Exception>(() => library.Save(collection));
+            Assert.Empty(library.GetAll());
+        }
+
+        [Fact]
+        public void FailedSaveOfAnExistingCollectionRollsBackToThePreviousValue()
+        {
+            var library = new JsonFileCollectionLibrary(m_FilePath);
+            var original = new Collection("Original");
+            library.Save(original);
+            var id = original.Id;
+
+            File.SetAttributes(m_FilePath, FileAttributes.ReadOnly);
+            try
+            {
+                // TryGet -> mutate -> Save, the same pattern
+                // CollectionUISystem.OnRenameCollection actually uses -
+                // mutating `original` directly wouldn't exercise TryGet's
+                // defensive-copy behavior (see its own comment) at all,
+                // and the rollback this is testing depends entirely on it.
+                Assert.True(library.TryGet(id, out var toRename));
+                toRename.Name = "Changed";
+                Assert.ThrowsAny<Exception>(() => library.Save(toRename));
+
+                Assert.True(library.TryGet(id, out var loaded));
+                Assert.Equal("Original", loaded.Name);
+            }
+            finally
+            {
+                File.SetAttributes(m_FilePath, FileAttributes.Normal);
+            }
+        }
+
+        [Fact]
+        public void FailedDeleteRollsBackInMemoryState()
+        {
+            var library = new JsonFileCollectionLibrary(m_FilePath);
+            var collection = new Collection("Persistent");
+            library.Save(collection);
+
+            File.SetAttributes(m_FilePath, FileAttributes.ReadOnly);
+            try
+            {
+                Assert.ThrowsAny<Exception>(() => library.Delete(collection.Id));
+                Assert.True(library.TryGet(collection.Id, out _));
+            }
+            finally
+            {
+                File.SetAttributes(m_FilePath, FileAttributes.Normal);
+            }
+        }
     }
 }

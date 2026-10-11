@@ -26,18 +26,62 @@ namespace CS2StyleMod.Core
 
         public IReadOnlyList<CustomZoneDefinition> GetAll() => m_Definitions.Values.ToList();
 
-        public bool TryGet(Guid id, out CustomZoneDefinition definition) => m_Definitions.TryGetValue(id, out definition);
+        // Returns a clone, not the library's own live reference - see
+        // JsonFileCollectionLibrary.TryGet's identical comment for why
+        // (same TryGet -> mutate -> Save pattern in ZoneUISystem, same
+        // bug it was silently defeating Save's rollback-on-failure for).
+        public bool TryGet(Guid id, out CustomZoneDefinition definition)
+        {
+            if (m_Definitions.TryGetValue(id, out var stored))
+            {
+                definition = stored.Clone();
+                return true;
+            }
 
+            definition = null;
+            return false;
+        }
+
+        // Strong exception safety - see JsonFileCollectionLibrary.Save's
+        // comment for the full reasoning (same pattern, same unguarded-
+        // I/O problem this fixes). Deliberately doesn't catch-and-swallow
+        // or log here - Core has no game/logging dependency by design
+        // (see ARCHITECTURE.md); ZoneUISystem catches and logs via Mod.log.
         public void Save(CustomZoneDefinition definition)
         {
+            var hadPrevious = m_Definitions.TryGetValue(definition.Id, out var previous);
             m_Definitions[definition.Id] = definition;
-            WriteToDisk();
+
+            try
+            {
+                WriteToDisk();
+            }
+            catch
+            {
+                if (hadPrevious)
+                    m_Definitions[definition.Id] = previous;
+                else
+                    m_Definitions.Remove(definition.Id);
+                throw;
+            }
         }
 
         public void Delete(Guid id)
         {
-            if (m_Definitions.Remove(id))
+            if (!m_Definitions.TryGetValue(id, out var removed))
+                return;
+
+            m_Definitions.Remove(id);
+
+            try
+            {
                 WriteToDisk();
+            }
+            catch
+            {
+                m_Definitions[id] = removed;
+                throw;
+            }
         }
 
         private static Dictionary<Guid, CustomZoneDefinition> Load(string filePath)

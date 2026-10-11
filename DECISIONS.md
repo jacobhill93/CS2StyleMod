@@ -2,6 +2,58 @@
 
 ## Decisions
 
+### Phase 5 audit found a real bug: unguarded file I/O on every save (2026-10-12)
+UI_OVERHAUL_PLAN.md's Phase 5 (loading/error/validation states) was
+deliberately low-priority until a real failure path turned up. Audited
+`CollectionUISystem`/`ZoneUISystem` and `JsonFileCollectionLibrary`/
+`JsonFileCustomZoneDefinitionLibrary` for one - found a real one, not a
+hypothetical: `WriteToDisk()` in both library classes did raw
+`File.WriteAllText`/`Delete`/`Move` with zero exception handling, called
+from every single mutation trigger (create/delete/rename/add/remove, on
+both Collections and Zones). A genuinely possible failure (disk full,
+the file locked by antivirus/backup software, permissions denied) would
+throw uncaught from inside a UI trigger callback - and worse, since
+`Save()`'s original ordering updated the in-memory dictionary *before*
+attempting the write, a failure there left in-memory state ahead of what
+was actually on disk: a crash right after would silently lose a change
+the player believed had saved.
+
+Fixed with strong exception safety in Core (`Save`/`Delete` either fully
+succeed or throw and leave state exactly as it was before the call) and
+logging moved to the UI layer (`CollectionUISystem.TrySave`/`TryDelete`,
+`ZoneUISystem`'s equivalents, via `Mod.log.Error`) - deliberately not
+logged inside Core itself, which has no game/logging dependency by
+design (see ARCHITECTURE.md); confirmed `Colossal.Logging.ILog.Error(Exception,
+object)` is a real overload via live reflection against the installed
+`Colossal.Logging.dll` (not guessed) - needed a plain .NET 8 console app
+to check, since PowerShell/.NET Framework's reflection can't load a type
+with default interface methods (`TypeLoadException: Non-abstract,
+non-.cctor method in an interface`) at all, reflection-only or not.
+
+**A second, deeper bug found while writing the tests for the first fix**:
+the initial rollback implementation looked structurally complete but was
+silently a no-op for the actual real-world call pattern. Every real
+caller does `TryGet(id, out var x); x.Mutate(...); Save(x);` - and
+`TryGet` was returning the library's own live object reference, not a
+copy. By the time `Save` ran, the caller's mutation had already landed
+on the exact object still sitting in the dictionary, so "roll back to
+the previous value" was rolling back to the *same, already-mutated*
+object - structurally present, semantically useless. Caught by a test
+that initially had the identical bug (it mutated its own local variable
+directly instead of going through `TryGet`, so it couldn't fail even
+against the broken implementation) - rewriting the test to match the
+real `TryGet -> mutate -> Save` pattern immediately exposed it. Fixed by
+adding `Collection.Clone()`/`CustomZoneDefinition.Clone()` and having
+`TryGet` return a clone, not the live reference - now documented as part
+of both interfaces' contracts, not just an implementation detail.
+
+Confirmed via 6 new tests (not mocked - real file I/O, a read-only file
+and a directory-as-path used to deterministically force real write
+failures), all 30 tests passing. Not yet confirmed in-game (the failure
+path itself is hard to trigger live - a locked file - but the normal
+create/delete/rename/add/remove flows all still need an in-game pass to
+confirm nothing regressed).
+
 ### Three polish items from a Road Builder compare/contrast (2026-10-12)
 Did a code-level comparison against Road Builder's real shipped source
 (already fetched/read this session) to find concrete, low-risk ways to

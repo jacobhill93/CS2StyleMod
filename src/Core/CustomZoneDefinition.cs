@@ -41,5 +41,19 @@ namespace CS2StyleMod.Core
         {
             m_CollectionIds.Remove(collectionId);
         }
+
+        // Shallow copy (CollectionIds are Guids, value types - a shallow
+        // copy of the list is a true independent copy). Exists so
+        // ICustomZoneDefinitionLibrary.TryGet can hand out a value the
+        // caller can freely mutate without that mutation silently
+        // touching the library's own stored state before Save is called -
+        // see Collection.Clone's identical comment for the full reasoning.
+        public CustomZoneDefinition Clone()
+        {
+            var clone = new CustomZoneDefinition(Id, Name, BaseZoneType);
+            foreach (var collectionId in m_CollectionIds)
+                clone.AddCollection(collectionId);
+            return clone;
+        }
     }
 }

@@ -25,18 +25,72 @@ namespace CS2StyleMod.Core
 
         public IReadOnlyList<Collection> GetAll() => m_Collections.Values.ToList();
 
-        public bool TryGet(Guid id, out Collection collection) => m_Collections.TryGetValue(id, out collection);
+        // Returns a clone, not the library's own live reference - every
+        // real caller follows a TryGet -> mutate -> Save pattern
+        // (CollectionUISystem), and without this, that mutation would
+        // land on the SAME object already sitting in m_Collections,
+        // before Save's own rollback-on-failure logic ever runs. Found
+        // via a failing test, not anticipated up front: Save's rollback
+        // looked structurally complete but was silently a no-op for
+        // exactly this pattern, since "the previous value" and "the
+        // caller's already-mutated value" were the same object reference.
+        public bool TryGet(Guid id, out Collection collection)
+        {
+            if (m_Collections.TryGetValue(id, out var stored))
+            {
+                collection = stored.Clone();
+                return true;
+            }
 
+            collection = null;
+            return false;
+        }
+
+        // Strong exception safety: either this fully succeeds (in-memory
+        // state updated AND persisted to disk), or it throws and leaves
+        // in-memory state exactly as it was before the call - never the
+        // in-between state of "looks saved in memory, isn't on disk"
+        // that WriteToDisk's un-caught I/O exceptions (disk full, file
+        // locked, permissions denied - all real, not hypothetical) used
+        // to leave behind. Deliberately doesn't catch-and-swallow or log
+        // here - Core has no game/logging dependency by design (see
+        // ARCHITECTURE.md), callers decide what to do with the
+        // exception (CollectionUISystem catches and logs via Mod.log).
         public void Save(Collection collection)
         {
+            var hadPrevious = m_Collections.TryGetValue(collection.Id, out var previous);
             m_Collections[collection.Id] = collection;
-            WriteToDisk();
+
+            try
+            {
+                WriteToDisk();
+            }
+            catch
+            {
+                if (hadPrevious)
+                    m_Collections[collection.Id] = previous;
+                else
+                    m_Collections.Remove(collection.Id);
+                throw;
+            }
         }
 
         public void Delete(Guid id)
         {
-            if (m_Collections.Remove(id))
+            if (!m_Collections.TryGetValue(id, out var removed))
+                return;
+
+            m_Collections.Remove(id);
+
+            try
+            {
                 WriteToDisk();
+            }
+            catch
+            {
+                m_Collections[id] = removed;
+                throw;
+            }
         }
 
         private static Dictionary<Guid, Collection> Load(string filePath)

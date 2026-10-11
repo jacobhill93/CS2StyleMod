@@ -54,7 +54,9 @@ namespace CS2StyleMod.UI
             if (!Guid.TryParse(id, out var guid) || string.IsNullOrWhiteSpace(name))
                 return;
 
-            Mod.CollectionLibrary.Save(new Collection(guid, name));
+            if (!TrySave(new Collection(guid, name), "create"))
+                return;
+
             RefreshCollections();
         }
 
@@ -63,7 +65,9 @@ namespace CS2StyleMod.UI
             if (!Guid.TryParse(id, out var guid))
                 return;
 
-            Mod.CollectionLibrary.Delete(guid);
+            if (!TryDelete(guid))
+                return;
+
             RefreshCollections();
         }
 
@@ -75,7 +79,9 @@ namespace CS2StyleMod.UI
                 return;
 
             collection.Name = newName;
-            Mod.CollectionLibrary.Save(collection);
+            if (!TrySave(collection, "rename"))
+                return;
+
             RefreshCollections();
         }
 
@@ -93,7 +99,9 @@ namespace CS2StyleMod.UI
                 return;
 
             collection.Add(new ExplicitAssetEntry(prefabId));
-            Mod.CollectionLibrary.Save(collection);
+            if (!TrySave(collection, "add building to"))
+                return;
+
             RefreshCollections();
         }
 
@@ -105,13 +113,54 @@ namespace CS2StyleMod.UI
                 return;
 
             collection.RemoveExplicitAsset(prefabId);
-            Mod.CollectionLibrary.Save(collection);
+            if (!TrySave(collection, "remove building from"))
+                return;
+
             RefreshCollections();
         }
 
         private void RefreshCollections()
         {
             m_Collections.Value = GetEntries();
+        }
+
+        // Centralizes the try/catch every mutation above needs -
+        // Mod.CollectionLibrary.Save/Delete have strong exception safety
+        // (a failed write rolls back in-memory state and throws, see
+        // ICollectionLibrary.cs) but deliberately don't log themselves
+        // (Core has no logging dependency - see ARCHITECTURE.md), so this
+        // is where a real, previously-uncaught failure (disk full, file
+        // locked, permissions denied) actually gets surfaced instead of
+        // propagating out of a UI trigger callback. Returns false on
+        // failure so the caller skips its dependent RefreshCollections -
+        // harmless either way now that the save itself rolled back
+        // cleanly, but pointless to refresh with data that didn't change.
+        private static bool TrySave(Collection collection, string action)
+        {
+            try
+            {
+                Mod.CollectionLibrary.Save(collection);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Mod.log.Error(ex, $"Failed to {action} collection '{collection.Id}' (\"{collection.Name}\") - change was not saved.");
+                return false;
+            }
+        }
+
+        private static bool TryDelete(Guid id)
+        {
+            try
+            {
+                Mod.CollectionLibrary.Delete(id);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Mod.log.Error(ex, $"Failed to delete collection '{id}' - it may still be present on disk.");
+                return false;
+            }
         }
 
         private static CollectionUIEntry[] GetEntries()

@@ -302,15 +302,31 @@ any implementation attempt.
 
 ### Phase 5 - Loading, error, and validation states
 
-- None of this exists yet anywhere in the mod (every trigger either
-  silently succeeds or silently no-ops). Wireframe section J has the
-  rules: keep form values on error, concise inline messages, don't close
-  a confirm dialog until the backend actually confirms.
-- Realistically low-value until a trigger can actually *fail* in a way
-  worth surfacing - audit `CollectionUISystem`/`ZoneUISystem` for any
-  real failure path (e.g. a duplicate name, a genuinely invalid base
-  zone type) before inventing UI for failures that can't currently
-  happen.
+**Audit done (2026-10-12), one real failure path found and fixed on the
+C# side - see DECISIONS.md "Phase 5 audit found a real bug" for the
+full story.** `JsonFileCollectionLibrary`/`JsonFileCustomZoneDefinitionLibrary`
+did raw file I/O with zero exception handling on every single mutation
+trigger - a genuinely possible failure (disk full, file locked,
+permissions denied), not a hypothetical one. Fixed with strong exception
+safety in Core and logging in the UI layer (`CollectionUISystem`/
+`ZoneUISystem`'s new `TrySave`/`TryDelete` helpers). Caught and fixed a
+second, deeper bug along the way: `TryGet` was returning the library's
+live object, not a copy, which silently defeated the rollback for the
+real `TryGet -> mutate -> Save` pattern every caller actually uses - see
+the DECISIONS.md entry for why that one only showed up once the test
+was written to match the real call pattern, not an idealized one.
+
+**Still open - the duplicate-name check and the `RenameCollection`/
+`RenameZone` dead-trigger cleanup, explicitly deferred by user request,
+not forgotten.** No UI-visible error/loading state exists yet (the
+C#-side fix above prevents the bad outcome, but a failed save today
+still looks the same to the player as nothing happening - no toast, no
+inline message). Wireframe section J's rules (keep form values on
+error, concise inline messages, don't close a confirm dialog until the
+backend confirms) remain unimplemented - revisit only if the current
+"silently does nothing, logged for diagnosis" behavior turns out to be
+insufficient in practice, same discipline as everything else in this
+plan.
 
 ### Phase 6 - Polish
 

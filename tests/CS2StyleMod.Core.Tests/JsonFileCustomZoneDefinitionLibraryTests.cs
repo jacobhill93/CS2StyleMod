@@ -117,5 +117,66 @@ namespace CS2StyleMod.Core.Tests
             Assert.False(found);
             Assert.Null(definition);
         }
+
+        [Fact]
+        public void FailedSaveOfANewDefinitionRollsBackInMemoryState()
+        {
+            // Pointed at a directory, not a file - see
+            // JsonFileCollectionLibraryTests's identical test for why this
+            // reliably fails WriteToDisk's File.Delete(m_FilePath) step.
+            var library = new JsonFileCustomZoneDefinitionLibrary(Path.GetTempPath());
+            var definition = new CustomZoneDefinition("Will Not Persist", ZoneType.ResidentialLow);
+
+            Assert.ThrowsAny<Exception>(() => library.Save(definition));
+            Assert.Empty(library.GetAll());
+        }
+
+        [Fact]
+        public void FailedSaveOfAnExistingDefinitionRollsBackToThePreviousValue()
+        {
+            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var original = new CustomZoneDefinition("Original", ZoneType.ResidentialLow);
+            library.Save(original);
+            var id = original.Id;
+
+            File.SetAttributes(m_FilePath, FileAttributes.ReadOnly);
+            try
+            {
+                // TryGet -> mutate -> Save, the same pattern
+                // ZoneUISystem.OnRenameZone actually uses - mutating
+                // `original` directly wouldn't exercise TryGet's
+                // defensive-copy behavior (see its own comment) at all,
+                // and the rollback this is testing depends entirely on it.
+                Assert.True(library.TryGet(id, out var toRename));
+                toRename.Name = "Changed";
+                Assert.ThrowsAny<Exception>(() => library.Save(toRename));
+
+                Assert.True(library.TryGet(id, out var loaded));
+                Assert.Equal("Original", loaded.Name);
+            }
+            finally
+            {
+                File.SetAttributes(m_FilePath, FileAttributes.Normal);
+            }
+        }
+
+        [Fact]
+        public void FailedDeleteRollsBackInMemoryState()
+        {
+            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var definition = new CustomZoneDefinition("Persistent", ZoneType.Industrial);
+            library.Save(definition);
+
+            File.SetAttributes(m_FilePath, FileAttributes.ReadOnly);
+            try
+            {
+                Assert.ThrowsAny<Exception>(() => library.Delete(definition.Id));
+                Assert.True(library.TryGet(definition.Id, out _));
+            }
+            finally
+            {
+                File.SetAttributes(m_FilePath, FileAttributes.Normal);
+            }
+        }
     }
 }

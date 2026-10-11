@@ -12,12 +12,21 @@ namespace CS2StyleMod.Core
     public interface ICustomZoneDefinitionLibrary
     {
         IReadOnlyList<CustomZoneDefinition> GetAll();
+
+        // Returns a copy, not the library's own internal reference - see
+        // ICollectionLibrary.TryGet's identical comment for why.
         bool TryGet(Guid id, out CustomZoneDefinition definition);
 
-        // Insert, or update in place if a definition with this Id already exists.
+        // Insert, or update in place if a definition with this Id already
+        // exists. Strong exception safety: a persistence failure (disk
+        // full, file locked, permissions denied) throws and leaves the
+        // library's state exactly as it was before the call - never a
+        // partial "looks saved, isn't on disk" state. Callers should
+        // catch and decide what to do (e.g. log and skip a dependent
+        // rebuild) rather than let it propagate uncaught.
         void Save(CustomZoneDefinition definition);
 
-        // No-op if the Id isn't present.
+        // No-op if the Id isn't present. Same exception-safety guarantee as Save.
         void Delete(Guid id);
     }
 }

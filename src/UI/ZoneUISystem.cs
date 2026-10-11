@@ -57,7 +57,9 @@ namespace CS2StyleMod.UI
             // zone shell exists and is paintable right away, before any
             // building is attached.
             var definition = new CustomZoneDefinition(guid, name, zoneType);
-            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            if (!TrySave(definition, "create"))
+                return;
+
             m_BuildRequestSystem.Request(definition, Enumerable.Empty<Collection>());
             RefreshZones();
         }
@@ -71,7 +73,9 @@ namespace CS2StyleMod.UI
             // in-game - same "removing doesn't touch what's already built"
             // philosophy as retiring a building, see DECISIONS.md. A
             // zone/buildings already painted with stay as they are.
-            Mod.CustomZoneDefinitionLibrary.Delete(guid);
+            if (!TryDelete(guid))
+                return;
+
             RefreshZones();
         }
 
@@ -83,7 +87,9 @@ namespace CS2StyleMod.UI
                 return;
 
             definition.Name = newName;
-            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            if (!TrySave(definition, "rename"))
+                return;
+
             // Rebuild so the in-game display name (CustomZoneBuilder.RegisterDisplayName) picks up the rename too.
             m_BuildRequestSystem.Request(definition, ResolveCollections(definition));
             RefreshZones();
@@ -97,7 +103,9 @@ namespace CS2StyleMod.UI
                 return;
 
             definition.AddCollection(collectionGuid);
-            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            if (!TrySave(definition, "attach a collection to"))
+                return;
+
             m_BuildRequestSystem.Request(definition, ResolveCollections(definition));
             RefreshZones();
         }
@@ -110,7 +118,9 @@ namespace CS2StyleMod.UI
                 return;
 
             definition.RemoveCollection(collectionGuid);
-            Mod.CustomZoneDefinitionLibrary.Save(definition);
+            if (!TrySave(definition, "detach a collection from"))
+                return;
+
             m_BuildRequestSystem.Request(definition, ResolveCollections(definition));
             RefreshZones();
         }
@@ -118,6 +128,42 @@ namespace CS2StyleMod.UI
         private void RefreshZones()
         {
             m_Zones.Value = GetEntries();
+        }
+
+        // Centralizes the try/catch every mutation above needs - see
+        // CollectionUISystem.TrySave's identical reasoning: strong
+        // exception safety lives in Core (ICustomZoneDefinitionLibrary),
+        // but Core deliberately doesn't log (no logging dependency by
+        // design), so this is where a real, previously-uncaught failure
+        // (disk full, file locked, permissions denied) actually gets
+        // surfaced, and where a now-pointless rebuild request is skipped
+        // since nothing actually changed.
+        private static bool TrySave(CustomZoneDefinition definition, string action)
+        {
+            try
+            {
+                Mod.CustomZoneDefinitionLibrary.Save(definition);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Mod.log.Error(ex, $"Failed to {action} zone '{definition.Id}' (\"{definition.Name}\") - change was not saved.");
+                return false;
+            }
+        }
+
+        private static bool TryDelete(Guid id)
+        {
+            try
+            {
+                Mod.CustomZoneDefinitionLibrary.Delete(id);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Mod.log.Error(ex, $"Failed to delete zone '{id}' - it may still be present on disk.");
+                return false;
+            }
         }
 
         private static IEnumerable<Collection> ResolveCollections(CustomZoneDefinition definition)

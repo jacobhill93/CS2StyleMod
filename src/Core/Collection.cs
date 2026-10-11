@@ -39,5 +39,23 @@ namespace CS2StyleMod.Core
         {
             m_Entries.RemoveAll(e => e is ExplicitAssetEntry explicitEntry && explicitEntry.PrefabId == prefabId);
         }
+
+        // Shallow copy - CollectionEntry subtypes are effectively
+        // immutable after construction (nothing mutates an entry's own
+        // fields in place, only adds/removes whole entries), so sharing
+        // entry references between the original and the clone is safe.
+        // Exists so ICollectionLibrary.TryGet can hand out a value the
+        // caller can freely mutate without that mutation silently
+        // touching the library's own stored state before Save is called -
+        // see JsonFileCollectionLibrary.TryGet's comment for why this
+        // matters (it's what makes Save's rollback-on-failure actually
+        // correct, not just structurally present).
+        public Collection Clone()
+        {
+            var clone = new Collection(Id, Name);
+            foreach (var entry in m_Entries)
+                clone.Add(entry);
+            return clone;
+        }
     }
 }
