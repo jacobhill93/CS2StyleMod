@@ -80,6 +80,90 @@ yet retested) - confirm a deleted zone actually disappears from the
 zone-painting tool's palette, and that cells already painted with it
 before deletion are unaffected.
 
+### Retire, take two: `active=false` alone does not hide a zone from the picker (2026-10-11)
+In-game testing disproved the attempt above: `active = false` +
+`AddOrUpdatePrefab` left the deleted zone fully visible and paintable,
+just with its icon replaced by the placeholder/"no picture" fallback -
+something was reading the new `active` state (the icon), but whatever
+actually decides which tiles the picker lists was not. Next attempt:
+also remove the zone's entry from its UI group's (`ZonesResidential`)
+`UIGroupElement` buffer directly. Also still visible in-game - but this
+round added diagnostic logging to every decision point first, which
+confirmed via the mod's own log that every step genuinely executed
+(zone found, `active=false` set, buffer entry actually removed,
+25→24 entries) with zero early returns. Also tried
+`PrefabSystem.UpdateAvailable()` afterward (a real method, confirmed via
+live reflection) on the theory that something was caching availability -
+also confirmed via log to run cleanly, also no visible effect. Closing
+and reopening the zone tool panel in-game (free, no code change) was
+tested too: the icon reverted from the placeholder back to normal, and
+the zone was still there - ruling out simple "stale UI, refreshes on
+reopen" as the explanation.
+
+Stopped guessing mechanisms from reflection-derived method names at this
+point and read actual decompiled game source
+(`D:\CS2-Decompiled\Game.Prefabs\UIGroupPrefab.cs`, `Locked.cs`,
+`UnlockRequirement.cs`, `UnlockSystem.cs`) instead. Found
+`UnlockSystem.IsLocked(prefab) => HasEnabledComponent<Locked>(prefab)` -
+looked like the real "is this available" check - and tried
+`EntityManager.SetComponentEnabled<Locked>(zoneEntity, true)` (the
+inverse of `UnlockSystem.UnlockPrefab`'s own `SetComponentEnabled<Locked>(_, false)`).
+Confirmed via log to execute with no warnings (the entity did carry a
+`Locked` component). Still visible in-game, even after navigating away
+to another mod and back - five mechanisms now confirmed-executed, zero
+visible effect, which meant the picker's actual data source still
+hadn't been found; mutating runtime ECS state by inference from names
+had run out of road.
+
+### Retire, take three: the real mechanism, found by reading the actual removal/UI-binding pipeline (2026-10-11)
+Searched the decompile tree for every file referencing the
+`Locked`/`UIGroupElement`/`UnlockRequirement` trio instead of guessing
+another one, and found `Game.Prefabs.UIInitializeSystem` -
+despite the name, its `OnUpdate` runs every frame (it's a
+`GameSystemBase`, not a one-shot init), querying for any entity with
+`PrefabData` + `Game.Common.Deleted`, and for each match removing it
+from its group's `UIGroupElement` **and** `UnlockRequirement` buffers
+automatically (`RemoveFrom`). None of the five prior attempts had ever
+added `Deleted` - that tag is the actual thing this cleanup pipeline
+watches for, not `active`, not `Locked`, not a buffer we edit by hand.
+
+`Game.Prefabs.PrefabSystem.RemovePrefab(PrefabBase)` is what the game
+itself calls "removing a prefab": it does
+`EntityManager.AddComponent<Deleted>(entity)` and deregisters the prefab
+from `PrefabSystem`'s own `m_Prefabs`/`m_Entities`/`m_PrefabIndices`.
+This project had previously avoided calling it here on an *unverified*
+suspicion that full removal would orphan cells already painted with
+that zone type (see the "non-destructive" reasoning two sections up).
+Checked that directly this time, in
+`Game.Prefabs.ZoneSystem.InitializeZonePrefabs`: a painted cell's
+`Cell.m_Zone.m_Index` is a separate, zone-specific index tracked by
+`ZoneSystem` itself (`GetNextIndex`/`m_ZonePrefabs`), completely
+unrelated to `PrefabSystem`'s own general prefab index - so
+`RemovePrefab`'s internal reindexing of `m_Prefabs`/`m_Entities` cannot
+touch it. `ZoneSystem` has its own explicit `Deleted`-tag handling
+branch that just clears that zone's slot in `m_ZonePrefabs` to
+`Entity.Null` and frees the index for reuse - exactly the wanted
+behavior, and clearly a scenario the base game's own authors designed
+for already, not an edge case being stumbled into.
+
+Replaced all five prior mutations in `CustomZoneBuilder.RetireZone` with
+the single call `m_PrefabSystem.RemovePrefab(zone)`.
+
+**First in-game test of this found a second, real bug**: deleting a
+zone while the zone tool still had it selected threw a `[CRITICAL]`
+`KeyNotFoundException` from `Game.Rendering.NetColorSystem.OnUpdate` -
+confirmed via its own decompiled source: every frame, while the zone
+tool is the active tool, it unconditionally calls
+`m_PrefabSystem.GetEntity(m_ZoneToolSystem.prefab)` with no
+`Deleted`-awareness at all, and a stale selection pointing at a
+just-removed prefab throws instead of returning `Entity.Null`. Fixed by
+having `RetireZone` check `m_ZoneToolSystem.prefab == zone` and clear it
+(set to `null`) before calling `RemovePrefab` - mirrors a UI discarding
+a reference to something it's about to delete. Confirmed in-game:
+clearing the selection force-closes the zone tool panel (acceptable UX,
+per user), no error, and the zone is gone from the picker on reopen -
+the bug is fixed.
+
 ### New feature: NA/EU region toggle on zone creation (2026-10-12)
 User reported custom zones always default to the EU theme and asked for
 an NA/EU toggle. Root cause, confirmed by reading

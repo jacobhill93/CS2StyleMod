@@ -3,6 +3,7 @@ using CS2StyleMod.Core;
 using CS2StyleMod.CustomZones.GameAdapters;
 using Game.Prefabs;
 using Game.SceneFlow;
+using Game.Tools;
 using Game.UI.InGame;
 using System;
 using System.Collections.Generic;
@@ -43,11 +44,13 @@ namespace CS2StyleMod.CustomZones
         private readonly SpawnableBuildingZoneLinker m_BuildingLinker;
         private readonly GameBuildingCatalog m_Catalog;
         private readonly GameZonePrefabResolver m_ZoneResolver;
+        private readonly ZoneToolSystem m_ZoneToolSystem;
 
         public CustomZoneBuilder(World world, GameBuildingCatalog catalog)
         {
             m_PrefabSystem = world.GetOrCreateSystemManaged<PrefabSystem>();
             m_PrefabUISystem = world.GetOrCreateSystemManaged<PrefabUISystem>();
+            m_ZoneToolSystem = world.GetOrCreateSystemManaged<ZoneToolSystem>();
             m_EntityManager = world.EntityManager;
             m_ZoneCloner = new ZonePrefabCloner(m_PrefabSystem);
             m_BuildingLinker = new SpawnableBuildingZoneLinker(m_PrefabSystem);
@@ -143,59 +146,82 @@ namespace CS2StyleMod.CustomZones
             return clonedZone;
         }
 
-        // Deactivates (does NOT remove) an already-built custom zone's
-        // prefab - same "stop offering, don't touch what's already built"
-        // philosophy as RetireBuildingsNoLongerResolved below: cells
-        // already painted with this zone keep working (removing the
-        // prefab outright, via PrefabSystem.RemovePrefab, risks orphaning
-        // them - not attempted, same reasoning that kept building
-        // retirement non-destructive). Looked up by internal name (same
-        // stable name every build/rebuild uses), not a held reference - a
-        // zone that was never actually built (its vanilla template was
-        // never found) has nothing to retire, a no-op not an error.
-        // Called via CustomZoneBuildRequestSystem.RequestRetirement, not
-        // directly - PrefabSystem.AddOrUpdatePrefab's own timing
-        // requirements (if any) aren't verified, and routing through the
-        // existing request queue costs nothing and guarantees the same
-        // safe UpdateBefore<_, PrefabSystem> timing BuildOrRebuild already
-        // relies on, rather than assuming this specific method has none.
+        // Sixth attempt (2026-10-11) - five prior mechanisms (active=false,
+        // manually removing the zone's UIGroupElement buffer entry,
+        // PrefabSystem.UpdateAvailable(), then enabling Locked on the
+        // entity) were each confirmed via logging to run cleanly with zero
+        // early returns, yet the zone stayed fully visible/paintable
+        // in-game every time, even after navigating away and back. Stopped
+        // guessing at the symptom layer and read the actual decompiled
+        // game source for the real removal pathway instead of inferring
+        // one from method names:
+        //  - Game.Prefabs.PrefabSystem.RemovePrefab(PrefabBase) is what the
+        //    game itself calls "removing a prefab" - it does
+        //    EntityManager.AddComponent<Deleted>(entity) (a real tag
+        //    component, Game.Common.Deleted) plus deregisters the prefab
+        //    from PrefabSystem's own m_Prefabs/m_Entities/m_PrefabIndices.
+        //  - Game.Prefabs.UIInitializeSystem runs every frame (not a
+        //    one-time init despite the name) with a query matching
+        //    PrefabData + Deleted, and for each match removes that entity
+        //    from its group's UIGroupElement AND UnlockRequirement buffers
+        //    automatically (RemoveFrom, called from its own OnUpdate).
+        //    This is the actual mechanism the picker's underlying data
+        //    depends on - none of the first five attempts ever added
+        //    Deleted, so this system never had anything to act on.
+        // Previously avoided RemovePrefab here on the (unverified)
+        // suspicion that fully removing the prefab would orphan cells
+        // already painted with this zone type. Checked that directly in
+        // Game.Prefabs.ZoneSystem.InitializeZonePrefabs: a painted cell's
+        // Cell.m_Zone.m_Index is a separate, zone-specific index (assigned
+        // by ZoneSystem.GetNextIndex, tracked in m_ZonePrefabs), not
+        // PrefabSystem's own general-purpose prefab index - the two are
+        // unrelated, so RemovePrefab's internal m_Prefabs/m_Entities
+        // reindexing can't renumber an already-painted cell's zone type
+        // out from under it. ZoneSystem's own Deleted-tag handling branch
+        // (same component RemovePrefab adds) just clears that zone's slot
+        // in m_ZonePrefabs to Entity.Null and frees the index for reuse -
+        // exactly the "stop offering it, don't corrupt what's already
+        // placed" behavior wanted here, and clearly a case the base game's
+        // own authors designed for already, not an edge case being
+        // stumbled into.
+        // Looked up by internal name (same stable name every build/rebuild
+        // uses), not a held reference - a zone that was never actually
+        // built (its vanilla template was never found) has nothing to
+        // retire, a no-op not an error. Called via
+        // CustomZoneBuildRequestSystem.RequestRetirement, not directly -
+        // same UpdateBefore<_, PrefabSystem> timing BuildOrRebuild already
+        // relies on.
         public void RetireZone(Guid definitionId)
         {
             var internalZoneName = GetInternalZoneName(definitionId);
 
             if (!m_ZoneResolver.TryFindByName(internalZoneName, out var zone, out var zoneEntity))
-                return;
-
-            zone.active = false;
-            m_PrefabSystem.AddOrUpdatePrefab(zone);
-
-            // Second attempt (2026-10-11) - flipping `active` alone was
-            // confirmed in-game NOT to hide the zone from the zone tool's
-            // picker. Real mechanism, found via further live reflection:
-            // Game.Prefabs.UIGroupElement is a genuine ECS
-            // IBufferElementData ({ Entity m_Prefab }) - a UI group's own
-            // entity carries a BUFFER of its member prefabs' entities,
-            // populated once at registration (the same UIObject.LateInitialize
-            // step ZonePrefabCloner's own m_Group comment already
-            // documents - "skips adding it to any category when m_Group
-            // is null"). Nothing removes an entry from that buffer
-            // automatically just because `active` changed afterward.
-            // Still not confirmed this buffer is what the picker actually
-            // reads (strong structural inference, not observed directly) -
-            // removing our zone's entry from it directly is the next,
-            // more targeted attempt.
-            if (zone.TryGet<UIObject>(out var uiObject) &&
-                uiObject.m_Group != null &&
-                m_PrefabSystem.TryGetEntity(uiObject.m_Group, out var groupEntity) &&
-                m_EntityManager.HasBuffer<UIGroupElement>(groupEntity))
             {
-                var buffer = m_EntityManager.GetBuffer<UIGroupElement>(groupEntity);
-                for (var i = buffer.Length - 1; i >= 0; i--)
-                {
-                    if (buffer[i].m_Prefab == zoneEntity)
-                        buffer.RemoveAt(i);
-                }
+                Mod.log.Warn($"[CustomZoneBuilder] RetireZone: no built prefab found for '{internalZoneName}' - nothing to retire.");
+                return;
             }
+
+            // First crash found in-game (2026-10-11): deleting a zone while
+            // the zone tool still had it selected threw a CRITICAL
+            // KeyNotFoundException from Game.Rendering.NetColorSystem -
+            // confirmed via its own decompiled source
+            // (D:\CS2-Decompiled\Game.Rendering\NetColorSystem.cs, OnUpdate):
+            // every frame, while the zone tool is the active tool, it
+            // unconditionally does m_PrefabSystem.GetEntity(m_ZoneToolSystem.prefab)
+            // with no Deleted-awareness at all - a stale selection pointing
+            // at a prefab RemovePrefab just deregistered throws instead of
+            // returning Entity.Null. Clearing the tool's own selection
+            // first (same idea as a UI discarding a reference to something
+            // it's about to delete) avoids this - PrefabSystem.RemovePrefab
+            // itself is still correct, see the comment below.
+            if (m_ZoneToolSystem.prefab == zone)
+            {
+                m_ZoneToolSystem.prefab = null;
+                Mod.log.Info($"[CustomZoneBuilder] RetireZone: '{zone.name}' was the zone tool's active selection - cleared it before removing the prefab.");
+            }
+
+            var removed = m_PrefabSystem.RemovePrefab(zone);
+            Mod.log.Info($"[CustomZoneBuilder] RetireZone: '{zone.name}' found (Entity {zoneEntity.Index}:{zoneEntity.Version}), PrefabSystem.RemovePrefab returned {removed}.");
         }
 
         private bool TryGetOrCloneZone(CustomZoneDefinition definition, string internalZoneName, out ZonePrefab clonedZone, out Entity clonedZoneEntity)
