@@ -10,11 +10,10 @@
     position: absolute;
     top: 60px;
     right: 10px;
-    // Bumped 420px -> 460px (thumbnail room) -> 560px (2026-10-09, user
-    // feedback after an in-game look: everything felt cramped - search
-    // box, icons, text - and there's no real estate pressure forcing a
-    // narrow panel. Not yet confirmed in-game.
-    width: 560px;
+    // Bumped 420px -> 460px (thumbnail room) -> 560px -> 840px (+50%,
+    // 2026-10-11, user feedback in-game: still room to spare, wanted the
+    // building thumbnails more visible).
+    width: 840px;
 
     &.fpsLevel1 {
         top: 80px;

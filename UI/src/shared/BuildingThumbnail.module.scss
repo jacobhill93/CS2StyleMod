@@ -6,10 +6,13 @@
 // shift) is the expected common case, not an edge case.
 .thumbnail,
 .placeholder {
-    width: 36px;
-    height: 36px;
+    // Bumped 28px -> 36px -> 48px alongside the panel's own +50% width
+    // increase (2026-10-11) - more room specifically to make the
+    // thumbnails themselves easier to actually see, not just whitespace.
+    width: 48px;
+    height: 48px;
     flex-shrink: 0;
-    border-radius: 4px;
+    border-radius: 5px;
 }
 
 .thumbnail {

@@ -2,6 +2,53 @@
 
 ## Decisions
 
+### Assets tab list virtualization attempt - reverted, broke the whole HUD (2026-10-11)
+User reported the Assets tab was "super laggy" - root cause diagnosed
+correctly: with no filter applied it renders up to ~3962 rows into the
+DOM simultaneously (thumbnail + two text spans + maybe a button each),
+which this engine (cohtml/Gameface) handles considerably worse than a
+desktop browser. Not new to this session - already flagged as a likely
+cause of stutter even in the old pre-overhaul `BuildingPicker`. The
+*diagnosis* is still believed correct; what follows is about the fix.
+
+First attempt: hand-rolled virtualization (`shared/useVirtualizedRows.ts`,
+now deleted), built against `cs2/ui`'s typed `Scrollable`
+`controller?: ScrollController` prop and `ScrollController.container`/
+`onScroll`, rendering only in-view rows via `position: absolute` inside
+a full-height spacer div. Typechecked cleanly against `UI/types/ui.d.ts`
+and compiled with zero errors - but **the type declarations describing
+the shape of an API are not proof it's safe to call at runtime the way
+they imply**, the same category of gap this project has hit before
+(ArrayWriter's real constructor, IJsonWriter's real methods - things
+only confirmed by checking actual behavior, not a header file). This
+session's one other attempt to build real-shell UI on an unverified
+assumption (the `draggable` Panel) took down the whole game HUD on first
+test, not just the mod's own panel - **the same thing happened here**:
+clicking the Assets tab made the entire HUD disappear.
+
+The underlying reason this class of bug is so severe in this project,
+confirmed earlier via `UI.log`: mod panels share the same `'Game'`
+render root as the vanilla HUD, with no error boundary around an
+individually appended panel - one uncaught throw anywhere in that tree
+takes the whole thing down, not just the offending panel.
+
+**Reverted immediately** (`git checkout` on `AssetsTab.tsx` back to the
+last commit, deleted the new hook) rather than attempt a blind fix -
+restore a known-good state first, root-cause properly before
+reattempting, same discipline as the `draggable` Panel incident. Did
+NOT revert the unrelated same-batch changes (panel width, thumbnail
+size, filter bar row split) - those are plain CSS/JSX restructuring
+with no new runtime API surface, much lower risk, and not a plausible
+cause of a total HUD crash.
+
+**Still needed before reattempting**: find out whether `new
+ScrollController()` is actually safe to construct freestanding (vs.
+needing to come from somewhere else - a hook, a ref callback, an
+internal factory), ideally from a real working mod's source that uses
+it, not from the ambient `.d.ts` alone. The lag itself is still real and
+unfixed - revisit once that's answered, don't reattempt the same
+construction pattern hoping it works differently.
+
 ### UniversalModMenu dock icon comes from the Paradox Mods publish listing, not mod code (2026-10-09)
 Resolved the open question from the probe entry below (what controls the
 dock icon shown next to a mod's `UniversalModMenu` entry) with direct
