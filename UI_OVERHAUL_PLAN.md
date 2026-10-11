@@ -1,5 +1,15 @@
 # UI Overhaul Plan
 
+**Status (2026-10-11): Phases 0-4c and 6 are implemented and confirmed
+working in-game (committed - the four old panels this plan replaces are
+deleted, not just unregistered). Only Phase 5 (loading/error/validation
+states) remains, and it's explicitly low-priority until a trigger can
+actually fail in a way worth surfacing - see that section.** The rest of
+this document is kept as the historical record of how each phase's
+design actually played out (several reversed course after an in-game
+test surfaced something the plan didn't anticipate) - read it for that
+context, not as a live TODO list.
+
 Goal: replace today's four independent floating panels (Collections,
 Zones, BuildingPicker, ZoneCollectionsPicker) with a single consolidated
 window, closer to Road Builder's actual shipped UI and the external
@@ -244,8 +254,10 @@ project makes) - the original preference order was wrong, and reversed:**
   something cohtml's `coui://` scheme can serve, none of which this
   session has verified end-to-end.
 
-**Implemented (2026-10-09), not yet confirmed in-game - second research
-pass flipped the approach again:** reading AIL's own actual source
+**Implemented (2026-10-09), confirmed in-game that it renders correctly
+(placeholders show with no crash/broken images) - whether AIL's writes
+are actually picked up is still a separate, open question (see below) -
+second research pass flipped the approach again:** reading AIL's own actual source
 (`IconReplacerSystem.cs`, fetched and read directly, not guessed from
 the README) showed it doesn't just expose a map for other mods to query
 - it **writes its resolved thumbnail URL directly into
@@ -303,7 +315,7 @@ any implementation attempt.
 
 ### Phase 6 - Polish
 
-**First pass done (2026-10-09), not yet confirmed in-game:**
+**Done and confirmed in-game (2026-10-09):**
 
 - Icon work was already carried forward during Phases 2-4b (icon-only
   buttons, `tooltipLabel`, Unified Icon Library) - no separate porting
@@ -354,9 +366,13 @@ different).
   panels) that skipping the in-game confirmation step between phases is
   how this session's worst regressions happened (`<select>`, `draggable`
   Panel, icon+text buttons) - all three were shipped on an assumption
-  that wasn't actually tested yet.
-- Don't delete `CollectionPanel.tsx`/`ZonePanel.tsx`/`BuildingPicker.tsx`/
-  `ZoneCollectionsPicker.tsx` until the new shell's equivalent is
-  confirmed working in-game and committed - keep the old, working panels
-  reachable (even if unregistered from `index.tsx`) as a fallback until
-  then.
+  that wasn't actually tested yet. This discipline held: every phase
+  above was confirmed in-game before the next one started, and the two
+  real bugs that did slip through (the asset-picker dialog's positioning
+  bug, the shell's leftover `opacity:0.8`) were both caught on the very
+  next in-game test, not several phases later.
+- (Historical, now done) `CollectionPanel.tsx`/`ZonePanel.tsx`/
+  `BuildingPicker.tsx`/`ZoneCollectionsPicker.tsx` were kept unregistered
+  as a fallback until the new shell's equivalents were confirmed working
+  in-game and committed - that happened, and all four were deleted (see
+  DECISIONS.md and the git history for that commit).

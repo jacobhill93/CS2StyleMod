@@ -2,8 +2,11 @@
 
 A Cities: Skylines II mod for controlling **which buildings grow where**.
 
-> Status: design phase. No code yet. See [ARCHITECTURE.md](ARCHITECTURE.md)
-> and [DECISIONS.md](DECISIONS.md).
+> Status: Custom Zones is implemented and confirmed working in-game -
+> Collections/Zones/Assets management UI, zone cloning, building
+> leveling, asset thumbnails. District Themes is shelved on a separate
+> unmerged branch (see [ARCHITECTURE.md](ARCHITECTURE.md)). See
+> [DECISIONS.md](DECISIONS.md) for the full history.
 
 ## Features
 
@@ -61,6 +64,7 @@ companion:
 | Mod | Why | Required? |
 |---|---|---|
 | [Unified Icon Library](https://mods.paradoxplaza.com/mods/74417/Windows) ([source](https://github.com/algernon-A/UnifiedIconLibrary)) | Button icons (Create/Edit/Delete/Add/Remove) across the Collections/Zones UI. Referenced by URL (`coui://uil/...`) at render time, not an API call - if it's not installed, those URLs 404 silently and buttons just show their text label with no icon. | No - purely cosmetic, nothing breaks without it. |
+| Asset Icon Library ([source](https://github.com/JadHajjar/AssetIconLibrary-CSII)) | Per-building thumbnails in the Assets tab and Collection membership lists. We don't call into AIL at all - it writes its resolved icon URL directly into the same `UIObject.m_Icon` field we read, so this works passively if AIL is installed and covers a given building. | No - a visible placeholder box renders instead of a thumbnail when it's missing or doesn't cover a prefab. |
 
 This list is documentation only for now, not yet wired into `UI/mod.json`'s
 own `dependencies` field - its real schema (hard load-blocking requirement

@@ -32,9 +32,20 @@ UI/                    the mod's actual UI (TypeScript/React) - a separate
                        `dotnet build` also runs its webpack build (see
                        CS2StyleMod.csproj's BuildUI target), so there's
                        still one build command for the whole mod.
-  src/mods/<Name>/     one React component folder per bound panel,
-                       matching the C# UI-binding system (src/UI/) it
-                       pairs with 1:1
+  src/mods/ShellFeature/
+                       the one registered UI shell (fixed-position,
+                       native open/close via shared/shellVisibility.ts +
+                       the game's UniversalModMenu hook) - a Zones/
+                       Collections/Assets tab bar, each tab its own
+                       component under ShellFeature/tabs/. Not a 1:1
+                       mapping to src/UI/'s binding systems anymore -
+                       one shell consumes CollectionUISystem/
+                       ZoneUISystem/BuildingPickerUISystem's bindings
+                       across its three tabs. See UI_OVERHAUL_PLAN.md
+                       for how this replaced four independent panels.
+  src/shared/          cross-tab React hooks/components (filter state,
+                       list-row styling, building thumbnails) - not
+                       bound to any single C# system
 ```
 
 ### Rules

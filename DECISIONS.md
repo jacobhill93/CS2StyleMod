@@ -1001,9 +1001,15 @@ adapter exists.
 - [ ] **Compatibility with other mods**: the Compatibility watchlist above
       is now populated with real, researched candidates (9 mods/lineages,
       sourced from live Paradox Mods data) - but every row is still
-      "Untested." Nothing has actually been checked for a real conflict
-      yet. Revisit once there's a build worth installing alongside them,
-      prioritizing the zoning-grid-rework group first.
+      "Untested" against a real conflict (does Platter actually pick up
+      our custom zones, does a zoning-grid-rework mod break anything,
+      etc.). **Partial data point (2026-10-10)**: user loaded a real
+      playset of ~40 code mods (Node Controller among them) alongside
+      this one - no crash, no mod-loading errors from any mod. That's
+      coexistence, not a row-by-row functional check against the
+      specific candidates above (Platter picking up custom zones,
+      interaction with the zoning-grid-rework group, etc.) - still worth
+      doing individually, prioritizing that group first.
 - [ ] Fallback policy: `Core.FallbackPolicy` now models *that* it's
       configurable (`None` vs `VanillaZone`), but not what the default
       should be, whether it's set per-collection or per-district, or what
@@ -1032,7 +1038,8 @@ adapter exists.
       source before `CandidateFilter` can be trusted for anything but
       single-building-per-lot cases.
 - [ ] **Building picker "size" filter (2026-10-08)**: the full building
-      picker (UI feature, in progress) needs a "building size (low/med/
+      picker (now the Assets tab/picking mode, see UI_OVERHAUL_PLAN.md)
+      needs a "building size (low/med/
       high)" filter alongside zone type, lot width/depth, level, and asset
       pack. Not yet clarified whether this means the same thing as zone
       density (`Core.ZoneType`'s Low/Medium/High split, which the picker
@@ -1040,4 +1047,6 @@ adapter exists.
       (e.g. low-rise vs. high-rise) that could apply *within* one zone
       category, derived from `ObjectGeometryData.m_Size`/
       `BuildingData.m_LotSize` rather than stored directly. Deferred by
-      user request - revisit once the rest of the picker is built.
+      user request - the Assets tab/picker is fully built now (zone/
+      level/width/depth/pack filters all work), this is the one filter
+      still not added. Revisit if it comes up again.
