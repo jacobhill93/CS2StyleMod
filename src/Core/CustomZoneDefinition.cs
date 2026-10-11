@@ -16,19 +16,28 @@ namespace CS2StyleMod.Core
         public string Name { get; set; }
         public ZoneType BaseZoneType { get; set; }
 
+        // Which vanilla theme variant this zone's simulation template was
+        // (or will be) cloned from - see Core.ZoneRegion for what this
+        // does and doesn't affect. Defaults to Europe, matching the
+        // behavior every zone had before this existed (GameZonePrefabResolver
+        // picked whatever candidate its entity query happened to return
+        // first, which was observed to always be an EU-themed one).
+        public ZoneRegion Region { get; set; }
+
         private readonly List<Guid> m_CollectionIds = new List<Guid>();
         public IReadOnlyList<Guid> CollectionIds => m_CollectionIds;
 
-        public CustomZoneDefinition(string name, ZoneType baseZoneType)
-            : this(Guid.NewGuid(), name, baseZoneType)
+        public CustomZoneDefinition(string name, ZoneType baseZoneType, ZoneRegion region = ZoneRegion.Europe)
+            : this(Guid.NewGuid(), name, baseZoneType, region)
         {
         }
 
-        public CustomZoneDefinition(Guid id, string name, ZoneType baseZoneType)
+        public CustomZoneDefinition(Guid id, string name, ZoneType baseZoneType, ZoneRegion region = ZoneRegion.Europe)
         {
             Id = id;
             Name = name;
             BaseZoneType = baseZoneType;
+            Region = region;
         }
 
         public void AddCollection(Guid collectionId)
@@ -50,7 +59,7 @@ namespace CS2StyleMod.Core
         // see Collection.Clone's identical comment for the full reasoning.
         public CustomZoneDefinition Clone()
         {
-            var clone = new CustomZoneDefinition(Id, Name, BaseZoneType);
+            var clone = new CustomZoneDefinition(Id, Name, BaseZoneType, Region);
             foreach (var collectionId in m_CollectionIds)
                 clone.AddCollection(collectionId);
             return clone;

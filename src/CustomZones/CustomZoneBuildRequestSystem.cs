@@ -1,6 +1,7 @@
 using CS2StyleMod.Core;
 using CS2StyleMod.CustomZones.GameAdapters;
 using Game;
+using System;
 using System.Collections.Generic;
 using Unity.Entities;
 
@@ -38,6 +39,7 @@ namespace CS2StyleMod.CustomZones
         }
 
         private readonly Queue<PendingRequest> m_PendingRequests = new Queue<PendingRequest>();
+        private readonly Queue<Guid> m_PendingRetirements = new Queue<Guid>();
         private CustomZoneBuilder m_Builder;
 
         protected override void OnCreate()
@@ -58,12 +60,28 @@ namespace CS2StyleMod.CustomZones
             m_PendingRequests.Enqueue(new PendingRequest(definition, collections));
         }
 
+        // Same "safe to call from anywhere, actually runs later at the
+        // right moment" contract as Request above - deactivates (doesn't
+        // remove) a deleted definition's already-built zone prefab, see
+        // CustomZoneBuilder.RetireZone's own comment for why this goes
+        // through the queue rather than calling PrefabSystem.AddOrUpdatePrefab
+        // directly from wherever Delete happens to be called from.
+        public void RequestRetirement(Guid definitionId)
+        {
+            m_PendingRetirements.Enqueue(definitionId);
+        }
+
         protected override void OnUpdate()
         {
             while (m_PendingRequests.Count > 0)
             {
                 var request = m_PendingRequests.Dequeue();
                 m_Builder.BuildOrRebuild(request.Definition, request.Collections);
+            }
+
+            while (m_PendingRetirements.Count > 0)
+            {
+                m_Builder.RetireZone(m_PendingRetirements.Dequeue());
             }
         }
     }

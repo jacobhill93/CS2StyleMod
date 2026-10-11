@@ -143,12 +143,67 @@ namespace CS2StyleMod.CustomZones
             return clonedZone;
         }
 
+        // Deactivates (does NOT remove) an already-built custom zone's
+        // prefab - same "stop offering, don't touch what's already built"
+        // philosophy as RetireBuildingsNoLongerResolved below: cells
+        // already painted with this zone keep working (removing the
+        // prefab outright, via PrefabSystem.RemovePrefab, risks orphaning
+        // them - not attempted, same reasoning that kept building
+        // retirement non-destructive). Looked up by internal name (same
+        // stable name every build/rebuild uses), not a held reference - a
+        // zone that was never actually built (its vanilla template was
+        // never found) has nothing to retire, a no-op not an error.
+        // Called via CustomZoneBuildRequestSystem.RequestRetirement, not
+        // directly - PrefabSystem.AddOrUpdatePrefab's own timing
+        // requirements (if any) aren't verified, and routing through the
+        // existing request queue costs nothing and guarantees the same
+        // safe UpdateBefore<_, PrefabSystem> timing BuildOrRebuild already
+        // relies on, rather than assuming this specific method has none.
+        public void RetireZone(Guid definitionId)
+        {
+            var internalZoneName = GetInternalZoneName(definitionId);
+
+            if (!m_ZoneResolver.TryFindByName(internalZoneName, out var zone, out var zoneEntity))
+                return;
+
+            zone.active = false;
+            m_PrefabSystem.AddOrUpdatePrefab(zone);
+
+            // Second attempt (2026-10-11) - flipping `active` alone was
+            // confirmed in-game NOT to hide the zone from the zone tool's
+            // picker. Real mechanism, found via further live reflection:
+            // Game.Prefabs.UIGroupElement is a genuine ECS
+            // IBufferElementData ({ Entity m_Prefab }) - a UI group's own
+            // entity carries a BUFFER of its member prefabs' entities,
+            // populated once at registration (the same UIObject.LateInitialize
+            // step ZonePrefabCloner's own m_Group comment already
+            // documents - "skips adding it to any category when m_Group
+            // is null"). Nothing removes an entry from that buffer
+            // automatically just because `active` changed afterward.
+            // Still not confirmed this buffer is what the picker actually
+            // reads (strong structural inference, not observed directly) -
+            // removing our zone's entry from it directly is the next,
+            // more targeted attempt.
+            if (zone.TryGet<UIObject>(out var uiObject) &&
+                uiObject.m_Group != null &&
+                m_PrefabSystem.TryGetEntity(uiObject.m_Group, out var groupEntity) &&
+                m_EntityManager.HasBuffer<UIGroupElement>(groupEntity))
+            {
+                var buffer = m_EntityManager.GetBuffer<UIGroupElement>(groupEntity);
+                for (var i = buffer.Length - 1; i >= 0; i--)
+                {
+                    if (buffer[i].m_Prefab == zoneEntity)
+                        buffer.RemoveAt(i);
+                }
+            }
+        }
+
         private bool TryGetOrCloneZone(CustomZoneDefinition definition, string internalZoneName, out ZonePrefab clonedZone, out Entity clonedZoneEntity)
         {
             if (m_ZoneResolver.TryFindByName(internalZoneName, out clonedZone, out clonedZoneEntity))
                 return true; // Already built in an earlier request - rebuilding in place.
 
-            if (!m_ZoneResolver.TryFindVanillaZone(definition.BaseZoneType, out var baseZone))
+            if (!m_ZoneResolver.TryFindVanillaZone(definition.BaseZoneType, definition.Region, out var baseZone))
             {
                 Mod.log.Warn($"[CustomZoneBuilder] No vanilla zone found for base type '{definition.BaseZoneType}' - cannot build '{definition.Name}'.");
                 clonedZone = null;

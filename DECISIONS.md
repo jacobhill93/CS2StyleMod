@@ -2,6 +2,140 @@
 
 ## Decisions
 
+### The real bug: zones were never rebuilt on a fresh game load (2026-10-11)
+What looked like three separate reports (a zone disappearing, a deleted
+zone not disappearing, persistence confusion) turned out to trace back
+to one real, more fundamental gap, found by reading the mod's own log
+directly rather than continuing to theorize from user reports alone:
+after `OnLoad` found an existing zone definition on disk (confirmed
+correct, persisted data - `TestZoneEU` with the right name/region/id),
+**zero `CustomZoneBuilder` activity appeared anywhere in that session's
+log.** Nothing ever rebuilds a zone's actual in-game `ZonePrefab` clone
+when the game loads fresh.
+
+Root cause: a `CustomZoneDefinition` (our own JSON data) persists fine
+across a restart - confirmed, the file had exactly the right data - but
+its actual in-game prefab clone does not. That's live ECS state tied to
+the current game session, never serialized into the save file at all.
+`CustomZoneBuildRequestSystem.Request(...)` was only ever called from
+`ZoneUISystem`'s four mutation triggers (create/rename/add-collection/
+remove-collection) - nothing on load ever called it for definitions that
+already existed. So a zone built in an earlier session simply had no
+prefab in a new one: not deleted, not hidden, just never rebuilt - and
+every "zones work" confirmation earlier in this session had happened
+within one continuous play session, never actually exercising a full
+quit+relaunch cycle until now.
+
+Fixed: `ZoneUISystem.OnGameLoaded` now iterates every known definition
+and requests a rebuild for each, the same call a create/rename/attach
+trigger already makes. Safe to do unconditionally for every zone on
+every load - `CustomZoneBuilder.BuildOrRebuild` is explicitly idempotent/
+additive by design (same safety property a rebuild-from-a-UI-edit
+already relied on).
+
+This also means the separate delete/retire attempts below were never
+actually wrong on their own terms - `TestZoneEU` was never deleted, so
+neither fix was even being exercised by the report that triggered this
+investigation. Whether `RetireZone`'s `UIGroupElement` buffer-removal
+attempt actually works is **still unconfirmed** - this fix addresses a
+different, independently-real bug found along the way, not a
+replacement for testing that one.
+
+Not yet confirmed in-game - needs a real restart test: create a zone,
+fully quit, relaunch, check it's paintable without touching anything
+else first.
+
+### Deleting a zone left its prefab fully paintable in-game (2026-10-12)
+User tested and confirmed: deleting a zone removed it from our own Zones
+tab, but the underlying vanilla zone prefab stayed fully registered and
+paintable in the game's own zone tool - you could keep zoning more of a
+"deleted" zone. Root cause: `ZoneUISystem.OnDeleteZone` only ever
+touched `Mod.CustomZoneDefinitionLibrary` (our own bookkeeping) - nothing
+anywhere ever reached back into the actual registered `ZonePrefab`.
+
+Fixed with the same non-destructive "retire, don't remove" philosophy
+`RetireBuildingsNoLongerResolved` already uses for buildings: cells
+already painted with the zone keep working (removing the prefab outright
+via `PrefabSystem.RemovePrefab` risked orphaning them, so not used),
+it just stops being *offered* going forward. `CustomZoneBuilder.RetireZone`
+sets the cloned `ZonePrefab`'s own `active` field to `false` and calls
+`PrefabSystem.AddOrUpdatePrefab` - both confirmed real via the same live
+reflection against `Game.dll` this project always uses before trusting
+an API, not guessed.
+
+**Timing discipline, not skipped**: this project already paid for one
+real bug from calling a `PrefabSystem`-touching operation from the wrong
+place (`CustomZoneBuildRequestSystem`'s whole reason for existing - see
+"A runtime-cloned prefab is only visible to init systems for one
+frame"). Whether `AddOrUpdatePrefab` has its own timing requirement
+(same as `AddPrefab`, or none at all) isn't verified either way - rather
+than assume "probably fine, it's a different method," retirement is
+routed through `CustomZoneBuildRequestSystem`'s existing request queue
+(`RequestRetirement`, processed in the same `OnUpdate` alongside builds,
+already registered `UpdateBefore<_, PrefabSystem>`) so it gets the exact
+same safe timing guarantee as a build, at zero extra cost or risk.
+
+Not yet confirmed in-game (implemented in response to the report, not
+yet retested) - confirm a deleted zone actually disappears from the
+zone-painting tool's palette, and that cells already painted with it
+before deletion are unaffected.
+
+### New feature: NA/EU region toggle on zone creation (2026-10-12)
+User reported custom zones always default to the EU theme and asked for
+an NA/EU toggle. Root cause, confirmed by reading
+`GameZonePrefabResolver.TryFindVanillaZone`'s existing comment: it
+always picked the *first* vanilla zone entity its query happened to
+return for a given `Core.ZoneType` category - no region logic existed
+at all, "any one will do," and that first match apparently always
+landed on an EU-themed candidate.
+
+**Researched the real mechanism before building anything** (live
+reflection against the installed `Game.dll`, not guessed): `ZonePrefab`
+itself carries no theme/region field. The real mechanism is a separate
+component, `Game.Prefabs.ThemeObject` (confirmed real, a
+`ComponentBase`-style prefab-authoring component - same category as
+`UIObject`, accessed via `PrefabBase.TryGet<T>()`, not an ECS
+`IComponentData` on the entity, since its one field,
+`ThemePrefab m_Theme`, is a managed object reference ECS components
+can't contain). `ThemePrefab` has an `assetPrefix` string field -
+strongly inferred (not yet directly confirmed with live data) to be
+`"NA"`/`"EU"`, matching the building-naming convention already
+empirically confirmed this project (`NA_MixedLeft01` etc. - see
+"Interaction between themes and the EU/NA theme setting and asset
+packs").
+
+Implemented: `Core.ZoneRegion` (`NorthAmerica`/`Europe`), a `Region`
+property on `CustomZoneDefinition` (defaults to `Europe` - matches
+every zone's actual observed behavior before this existed, both in a
+fresh `new CustomZoneDefinition(...)` call and when loading an old save
+file that predates this field - see `CustomZoneDefinitionDto.Region`'s
+own comment), and `GameZonePrefabResolver.TryFindVanillaZone` now
+prefers a candidate whose `ThemeObject.m_Theme.assetPrefix` matches the
+requested region, falling back to the old "any match" behavior if no
+themed candidate exists for that category (a safety net, not expected
+to actually trigger, but zone creation shouldn't hard-fail over a
+region preference). Region is fixed at creation, same as base zone
+type, for the same reason (`BuildOrRebuild` only resolves the vanilla
+template once, at first build - see `CustomZoneDefinition.Region`'s own
+comment).
+
+**What's confirmed vs. not**: the whole chain compiles cleanly against
+the real `Game.dll` types (a genuine signal - `ThemeObject`/`ThemePrefab`
+and `PrefabBase.TryGet<ThemeObject>` are real, not fabricated), and 33
+Core tests cover `Region`'s persistence/backward-compat behavior. **Not
+yet confirmed**: whether vanilla zone prefabs actually carry a
+`ThemeObject` component at all (vs. the EU/NA distinction living
+somewhere else entirely, e.g. purely in `UIObject.m_Group`'s target
+group prefab identity), and whether `assetPrefix`'s literal values are
+really `"NA"`/`"EU"` rather than something else. Both are strong,
+evidence-backed inferences, not confirmed live data - the fallback to
+"any match" means the worst case if this turns out wrong is the toggle
+silently has no effect (zones keep defaulting to whatever they did
+before), not a crash or a broken zone. Needs an in-game test: create
+one zone as NA and one as EU (same base type), check the zone-painting
+tool's category picker actually places them under different regional
+groups.
+
 ### Phase 5 audit found a real bug: unguarded file I/O on every save (2026-10-12)
 UI_OVERHAUL_PLAN.md's Phase 5 (loading/error/validation states) was
 deliberately low-priority until a real failure path turned up. Audited

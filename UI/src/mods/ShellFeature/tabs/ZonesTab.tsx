@@ -18,6 +18,7 @@ interface ZoneEntry {
     id: string;
     name: string;
     baseZoneType: string;
+    region: string;
     collectionIds: string[];
 }
 
@@ -32,6 +33,17 @@ const BASE_ZONE_TYPES = [
     "Office",
     "Industrial",
 ];
+
+// Mirrors Core.ZoneRegion exactly (src/Core/Primitives.cs) - literal
+// enum member names, not display labels, since this goes straight to
+// Enum.TryParse<ZoneRegion> on the C# side (case-sensitive, same
+// convention BASE_ZONE_TYPES above already follows for ZoneType). Which
+// vanilla theme (UI category/catalog grouping, not simulation behavior -
+// see Core.ZoneRegion's own comment) the zone's underlying template is
+// cloned from, fixed at creation same as base type - see
+// ZoneUISystem.OnCreateZone's comment for why.
+type ZoneRegion = "NorthAmerica" | "Europe";
+const REGION_LABELS: Record<ZoneRegion, string> = { NorthAmerica: "NA", Europe: "EU" };
 
 const Zones$ = bindValue<ZoneEntry[]>(mod.id, "Zones", []);
 const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
@@ -71,6 +83,7 @@ interface ZonesListProps {
 const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
     const [newName, setNewName] = useState("");
     const [newBaseZoneType, setNewBaseZoneType] = useState(ANY);
+    const [newRegion, setNewRegion] = useState<ZoneRegion>("Europe");
     const [createError, setCreateError] = useState(false);
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
@@ -82,9 +95,10 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
         }
 
         const id = generateGuid();
-        trigger(mod.id, "CreateZone", id, name, newBaseZoneType);
+        trigger(mod.id, "CreateZone", id, name, newBaseZoneType, newRegion);
         setNewName("");
         setNewBaseZoneType(ANY);
+        setNewRegion("Europe");
         setCreateError(false);
         onSelect(id);
     };
@@ -124,7 +138,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                         ) : (
                             <>
                                 <span onClick={() => onSelect(zone.id)} className={classNames(rowStyles.primary, rowStyles.clickable)}>
-                                    {zone.name} ({zone.baseZoneType}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
+                                    {zone.name} ({zone.baseZoneType}, {REGION_LABELS[zone.region as ZoneRegion] ?? zone.region}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
                                 </span>
                                 <div className={rowStyles.actions}>
                                     <Button variant="icon" src={Icons.pencil} tooltipLabel="Edit" onSelect={() => onSelect(zone.id)} />
@@ -155,6 +169,17 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                             if (createError) setCreateError(false);
                         }}
                     />
+                    {(Object.keys(REGION_LABELS) as ZoneRegion[]).map((region) => (
+                        <Button
+                            key={region}
+                            variant="flat"
+                            selected={newRegion === region}
+                            tooltipLabel={region === "NorthAmerica" ? "North America theme" : "Europe theme"}
+                            onSelect={() => setNewRegion(region)}
+                        >
+                            {REGION_LABELS[region]}
+                        </Button>
+                    ))}
                     <Button onSelect={onCreate}>Create</Button>
                 </div>
                 {createError && <span style={{ fontSize: "12px", color: "#ff8080" }}>Name and base type are both required.</span>}

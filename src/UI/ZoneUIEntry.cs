@@ -11,13 +11,15 @@ namespace CS2StyleMod.UI
         private readonly string m_Id;
         private readonly string m_Name;
         private readonly string m_BaseZoneType;
+        private readonly string m_Region;
         private readonly string[] m_CollectionIds;
 
-        public ZoneUIEntry(string id, string name, string baseZoneType, string[] collectionIds)
+        public ZoneUIEntry(string id, string name, string baseZoneType, string region, string[] collectionIds)
         {
             m_Id = id;
             m_Name = name;
             m_BaseZoneType = baseZoneType;
+            m_Region = region;
             m_CollectionIds = collectionIds;
         }
 
@@ -30,6 +32,8 @@ namespace CS2StyleMod.UI
             writer.Write(m_Name);
             writer.PropertyName("baseZoneType");
             writer.Write(m_BaseZoneType);
+            writer.PropertyName("region");
+            writer.Write(m_Region);
             writer.PropertyName("collectionIds");
             writer.ArrayBegin((uint)m_CollectionIds.Length);
             foreach (var id in m_CollectionIds)

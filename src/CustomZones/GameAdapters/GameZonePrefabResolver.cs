@@ -31,16 +31,28 @@ namespace CS2StyleMod.CustomZones.GameAdapters
                 ComponentType.ReadOnly<PrefabData>());
         }
 
-        // Picks the first registered vanilla zone matching the given
-        // category - same "any one will do" approach the original debug
-        // harnesses used, since the regional (EU/NA) variants only differ
-        // in theme/catalog grouping, not simulation profile, as far as
-        // we've found. Revisit if that ever turns out wrong.
-        public bool TryFindVanillaZone(CoreZoneType zoneType, out ZonePrefab prefab)
+        // Picks a registered vanilla zone matching the given category AND
+        // region - region is purely which UIGroupPrefab the clone displays
+        // under (see Core.ZoneRegion), not a different simulation profile.
+        // Prefers a themed match (a candidate carrying a ThemeObject whose
+        // m_Theme.assetPrefix matches the requested region - confirmed
+        // real via live reflection against Game.dll: ThemeObject is a
+        // ComponentBase-style prefab-authoring component, same pattern as
+        // UIObject, accessed the same way via PrefabBase.TryGet<T>(), not
+        // an ECS IComponentData on the entity), falling back to the first
+        // match of any region if no themed candidate exists for this
+        // category - same "any one will do" behavior this always had
+        // before region selection existed, kept as a safety net rather
+        // than failing zone creation outright if a themed variant turns
+        // out not to exist for some category.
+        public bool TryFindVanillaZone(CoreZoneType zoneType, Core.ZoneRegion region, out ZonePrefab prefab)
         {
             var entities = m_ZoneQuery.ToEntityArray(Allocator.Temp);
             try
             {
+                ZonePrefab fallback = null;
+                var assetPrefix = region == Core.ZoneRegion.NorthAmerica ? "NA" : "EU";
+
                 foreach (var entity in entities)
                 {
                     if (!m_EntityManager.TryGetComponent<ZoneData>(entity, out var zoneData) ||
@@ -50,17 +62,28 @@ namespace CS2StyleMod.CustomZones.GameAdapters
                     if (!GameBuildingCatalog.TryMapToCoreZoneType(zoneData, zoneProps, out var candidateZoneType) || candidateZoneType != zoneType)
                         continue;
 
-                    if (m_PrefabSystem.TryGetPrefab<ZonePrefab>(entity, out prefab))
+                    if (!m_PrefabSystem.TryGetPrefab<ZonePrefab>(entity, out var candidate))
+                        continue;
+
+                    if (fallback == null)
+                        fallback = candidate;
+
+                    if (candidate.TryGet<ThemeObject>(out var themeObject) &&
+                        themeObject.m_Theme != null &&
+                        string.Equals(themeObject.m_Theme.assetPrefix, assetPrefix, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        prefab = candidate;
                         return true;
+                    }
                 }
+
+                prefab = fallback;
+                return fallback != null;
             }
             finally
             {
                 entities.Dispose();
             }
-
-            prefab = null;
-            return false;
         }
 
         // Exact-name lookup, same technique as GameBuildingCatalog.TryGetBuildingPrefab

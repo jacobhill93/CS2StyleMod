@@ -48,6 +48,46 @@ namespace CS2StyleMod.Core.Tests
         }
 
         [Fact]
+        public void ConstructingWithoutAnExplicitRegionDefaultsToEurope()
+        {
+            var definition = new CustomZoneDefinition("Test", ZoneType.ResidentialLow);
+
+            Assert.Equal(ZoneRegion.Europe, definition.Region);
+        }
+
+        [Fact]
+        public void SavedDefinitionPersistsItsRegion()
+        {
+            var definition = new CustomZoneDefinition("North American Suburb", ZoneType.ResidentialLow, ZoneRegion.NorthAmerica);
+
+            new JsonFileCustomZoneDefinitionLibrary(m_FilePath).Save(definition);
+
+            var reopened = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            Assert.True(reopened.TryGet(definition.Id, out var loaded));
+            Assert.Equal(ZoneRegion.NorthAmerica, loaded.Region);
+        }
+
+        [Fact]
+        public void LoadingALibraryFileSavedBeforeRegionExistedDefaultsToEurope()
+        {
+            // Hand-written, deliberately missing the "Region" field - what
+            // every library file saved before this feature existed
+            // actually looks like. Must default to Europe, not
+            // ZoneRegion's own zero-value (NorthAmerica) - see
+            // CustomZoneDefinitionDto.Region's own comment for why.
+            var id = Guid.NewGuid();
+            var json = "{ \"SchemaVersion\": 1, \"Definitions\": [ "
+                + $"{{ \"Id\": \"{id}\", \"Name\": \"Old Save\", \"BaseZoneType\": \"ResidentialLow\", \"CollectionIds\": [] }}"
+                + " ] }";
+            File.WriteAllText(m_FilePath, json);
+
+            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+
+            Assert.True(library.TryGet(id, out var loaded));
+            Assert.Equal(ZoneRegion.Europe, loaded.Region);
+        }
+
+        [Fact]
         public void RenamingDoesNotChangeTheId()
         {
             var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);

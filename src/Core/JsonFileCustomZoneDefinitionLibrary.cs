@@ -131,13 +131,14 @@ namespace CS2StyleMod.Core
                 Id = definition.Id,
                 Name = definition.Name,
                 BaseZoneType = definition.BaseZoneType,
+                Region = definition.Region,
                 CollectionIds = definition.CollectionIds.ToList(),
             };
         }
 
         private static CustomZoneDefinition FromDto(CustomZoneDefinitionDto dto)
         {
-            var definition = new CustomZoneDefinition(dto.Id, dto.Name, dto.BaseZoneType);
+            var definition = new CustomZoneDefinition(dto.Id, dto.Name, dto.BaseZoneType, dto.Region);
             foreach (var collectionId in dto.CollectionIds ?? Enumerable.Empty<Guid>())
                 definition.AddCollection(collectionId);
             return definition;
@@ -157,6 +158,15 @@ namespace CS2StyleMod.Core
             public Guid Id { get; set; }
             public string Name { get; set; }
             public ZoneType BaseZoneType { get; set; }
+            // Explicit default (not the enum's own zero-value), so an
+            // existing library file saved before this field existed
+            // deserializes every zone as Europe - matching the behavior
+            // they actually had (GameZonePrefabResolver picked whatever
+            // its entity query happened to return first, observed to
+            // always be an EU-themed candidate) - not silently
+            // reinterpreting them as NorthAmerica just because that
+            // happens to be ZoneRegion's first declared value.
+            public ZoneRegion Region { get; set; } = ZoneRegion.Europe;
             public List<Guid> CollectionIds { get; set; } = new List<Guid>();
         }
     }

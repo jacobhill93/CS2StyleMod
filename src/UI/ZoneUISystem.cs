@@ -1,3 +1,4 @@
+using Colossal.Serialization.Entities;
 using CS2StyleMod.Core;
 using CS2StyleMod.CustomZones;
 using System;
@@ -31,19 +32,48 @@ namespace CS2StyleMod.UI
 
             m_Zones = CreateBinding("Zones", GetEntries());
 
-            CreateTrigger<string, string, string>("CreateZone", OnCreateZone);
+            CreateTrigger<string, string, string, string>("CreateZone", OnCreateZone);
             CreateTrigger<string>("DeleteZone", OnDeleteZone);
             CreateTrigger<string, string>("RenameZone", OnRenameZone);
             CreateTrigger<string, string>("AddCollectionToZone", OnAddCollectionToZone);
             CreateTrigger<string, string>("RemoveCollectionFromZone", OnRemoveCollectionFromZone);
         }
 
-        private void OnCreateZone(string id, string name, string baseZoneType)
+        // The actual bug behind "a zone I created in an earlier session
+        // doesn't show up in the game's zone tool after a restart" -
+        // confirmed via the mod's own log (2026-10-11): a fresh load that
+        // found an existing definition on disk showed zero
+        // CustomZoneBuilder activity. A CustomZoneDefinition (our own
+        // JSON data) persists fine across a restart, but its actual
+        // in-game ZonePrefab clone does not - that's live ECS state tied
+        // to this game session, never serialized into our save file, and
+        // nothing was ever re-requesting it. Without this, a zone built
+        // in an earlier session simply has no prefab in a new one: not
+        // deleted, not hidden, just never rebuilt. Rebuilds every known
+        // zone the same way a create/rename/attach trigger already does -
+        // BuildOrRebuild is explicitly safe to call repeatedly (its own
+        // doc comment: "idempotent... additive"), so looping over every
+        // definition unconditionally isn't a special case needing its own
+        // caution.
+        protected override void OnGameLoaded(Context context)
+        {
+            base.OnGameLoaded(context);
+
+            foreach (var definition in Mod.CustomZoneDefinitionLibrary.GetAll())
+                m_BuildRequestSystem.Request(definition, ResolveCollections(definition));
+        }
+
+        private void OnCreateZone(string id, string name, string baseZoneType, string region)
         {
             if (!Guid.TryParse(id, out var guid) || string.IsNullOrWhiteSpace(name))
                 return;
             if (!Enum.TryParse<ZoneType>(baseZoneType, out var zoneType))
                 return;
+            // Same reasoning as BaseZoneType: unrecognized/missing falls
+            // back to Europe, matching every zone's observed behavior
+            // before region selection existed - see CustomZoneDefinition.Region.
+            if (!Enum.TryParse<ZoneRegion>(region, out var zoneRegion))
+                zoneRegion = ZoneRegion.Europe;
 
             // Chosen once, at creation, not editable afterward - see
             // DECISIONS.md "A zone's base type is fixed at creation, not
@@ -55,8 +85,10 @@ namespace CS2StyleMod.UI
             // while the zone itself kept whatever density it was first
             // cloned as. Built immediately with zero collections so the
             // zone shell exists and is paintable right away, before any
-            // building is attached.
-            var definition = new CustomZoneDefinition(guid, name, zoneType);
+            // building is attached. Region follows the same "fixed at
+            // creation" reasoning - BuildOrRebuild resolves its vanilla
+            // template once, at first build, not on every rebuild.
+            var definition = new CustomZoneDefinition(guid, name, zoneType, zoneRegion);
             if (!TrySave(definition, "create"))
                 return;
 
@@ -69,13 +101,18 @@ namespace CS2StyleMod.UI
             if (!Guid.TryParse(id, out var guid))
                 return;
 
-            // Deleting the definition doesn't retract what's already built
-            // in-game - same "removing doesn't touch what's already built"
-            // philosophy as retiring a building, see DECISIONS.md. A
-            // zone/buildings already painted with stay as they are.
             if (!TryDelete(guid))
                 return;
 
+            // Deactivates (doesn't remove) the zone's already-built prefab
+            // so it stops being offered as a paintable option - without
+            // this, deleting only removed our own bookkeeping and the
+            // zone stayed fully visible/paintable in the vanilla zone
+            // tool (confirmed in-game, 2026-10-12). Already-painted cells
+            // of this zone keep working - same "removing doesn't touch
+            // what's already built" philosophy as retiring a building,
+            // see DECISIONS.md and CustomZoneBuilder.RetireZone's comment.
+            m_BuildRequestSystem.RequestRetirement(guid);
             RefreshZones();
         }
 
@@ -182,6 +219,7 @@ namespace CS2StyleMod.UI
                     z.Id.ToString(),
                     z.Name,
                     z.BaseZoneType.ToString(),
+                    z.Region.ToString(),
                     z.CollectionIds.Select(id => id.ToString()).ToArray()))
                 .ToArray();
         }
