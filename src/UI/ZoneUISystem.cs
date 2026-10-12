@@ -32,11 +32,26 @@ namespace ZoneBuilder.UI
 
             m_Zones = CreateBinding("Zones", GetEntries());
 
+            // Getter-based, not the usual "set .Value on mutation" style
+            // every other binding here uses - see ZoneBuildProgressEntry's
+            // own comment for why: CurrentProgress changes continuously
+            // while a build is in flight, with no single mutation point
+            // to hang a refresh off of.
+            CreateBinding<ZoneBuildProgressEntry>("BuildProgress", GetBuildProgress);
+
             CreateTrigger<string, string, string, string>("CreateZone", OnCreateZone);
             CreateTrigger<string>("DeleteZone", OnDeleteZone);
             CreateTrigger<string, string>("RenameZone", OnRenameZone);
             CreateTrigger<string, string>("AddCollectionToZone", OnAddCollectionToZone);
             CreateTrigger<string, string>("RemoveCollectionFromZone", OnRemoveCollectionFromZone);
+        }
+
+        private ZoneBuildProgressEntry GetBuildProgress()
+        {
+            var progress = m_BuildRequestSystem.CurrentProgress;
+            return progress.HasValue
+                ? new ZoneBuildProgressEntry(true, progress.Value.ZoneName, progress.Value.Completed, progress.Value.Total)
+                : ZoneBuildProgressEntry.Inactive;
         }
 
         // The actual bug behind "a zone I created in an earlier session

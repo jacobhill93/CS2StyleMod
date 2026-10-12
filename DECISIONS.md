@@ -42,6 +42,71 @@ the fix is algorithmically sound and the existing automated coverage
 still passes, but the real test is attaching that same collection again
 and confirming it no longer hangs.
 
+**Update: re-tested, still froze (~90s) - but the name-index fix was
+real and did help.** Confirmed no longer needing a force-kill (recovered
+on its own that time), and the log revealed the real remaining shape of
+the problem: retiring that zone and re-attaching the *exact same* 349
+buildings to a brand new zone moments later took **12 seconds**, not
+90. Since the fixed lookup cache runs identically both times, an
+algorithmic cost in our own code would cost the same either time - it
+didn't, so the lookup fix had already done its job. The remaining ~90s
+is a one-time-per-session cost tied to first use of each uniquely-
+referenced building prefab (most likely the engine loading/decompressing
+their mesh/texture/icon assets from disk the first time anything clones
+from them, cached thereafter) - not something this mod causes or can
+eliminate, confirmed indirectly by `Player.log` logging `Unloading 349
+unused Assets` in the same window. See "Chunked, incremental zone
+building" below for the actual mitigation - spreading the unavoidable
+cost across frames instead of trying to eliminate it.
+
+**Separately noticed, not yet fixed**: `RetireZone` only removes the
+*zone* prefab, not the buildings it had cloned - retiring a zone orphans
+its building clones rather than cleaning them up, so repeated create/
+retire cycles quietly accumulate dead prefabs over a long session. Not
+the cause of this freeze; worth a follow-up on its own.
+
+### Chunked, incremental zone building, with a "building zone..." UI indicator (2026-10-11)
+Follow-up to the freeze above: once the remaining ~90s was understood to
+be unavoidable, one-time, per-building-prefab engine cost rather than
+anything fixable in our own algorithm, the right mitigation is spreading
+it across many frames instead of doing all 349 (or however many) clones
+synchronously in one. `CustomZoneBuilder.BuildOrRebuild` is now
+`BuildOrRebuildIncremental`, a C# iterator yielding a `ZoneBuildProgress`
+every `entriesPerTick` collection entries (5, by default -
+`CustomZoneBuildRequestSystem.EntriesPerTick`) instead of only after
+every entry is done. `CustomZoneBuildRequestSystem.OnUpdate` advances it
+exactly one step (one `MoveNext()`) per tick, bounding how much of any
+single frame a build can cost to roughly `EntriesPerTick * (per-entry
+cost)` rather than `(all entries) * (per-entry cost)`.
+
+Moved the Platter nudge call (`PlatterCompatibility.NudgeZoneGroupForPlatter`)
+from `CustomZoneBuildRequestSystem` into `CustomZoneBuilder.BuildOrRebuildIncremental`
+itself, right after the zone resolves, since it has to happen in the
+exact same tick as the zone's own `Created` tag - true on the very first
+`MoveNext()` of a new build regardless of how the rest of the work gets
+chunked, but would have needed new coordination to guarantee from the
+calling system otherwise.
+
+Exposed via `CustomZoneBuildRequestSystem.CurrentProgress` (a nullable
+`ZoneBuildProgress` - null means no build in flight), polled every UI
+tick by a new getter-based binding (`ZoneUISystem`'s `"BuildProgress"`,
+backed by `ZoneBuildProgressEntry` - same hand-written `IJsonWritable`
+reasoning `ZoneUIEntry` already established, since `ExtendedUISystemBase`'s
+generic reflection writer doesn't preserve camelCase keys). Getter-based
+rather than the usual "set .Value on mutation" pattern every other
+binding here uses, because progress changes continuously while a build
+is running, not at one discrete mutation point. `ZonesTab.tsx` renders a
+small spinner + "Building '<name>'... X/Y" banner above whichever
+sub-view (list or detail) is currently showing, since a build can be
+triggered from either (creating a zone, or attaching a collection from
+the detail view).
+
+Confirmed: full build (C# + UI) succeeds, all 33 Core tests still pass.
+**Not yet re-tested in-game** - the real test is attaching "Suburbs -
+Fisher Pass" (or an equally large collection) again and confirming the
+game stays responsive throughout, with the banner visible, instead of
+freezing.
+
 ### Renamed the mod from CS2StyleMod to Zone Builder (2026-10-11)
 User settled on a name. Code-level scope only this pass (per explicit
 instruction) - the C# namespace, mod id, deployed folder name, UI

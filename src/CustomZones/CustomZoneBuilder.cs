@@ -7,6 +7,7 @@ using Game.Tools;
 using Game.UI.InGame;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Entities;
 
 namespace ZoneBuilder.CustomZones
@@ -68,7 +69,23 @@ namespace ZoneBuilder.CustomZones
         // construction) without touching the entity itself or anything
         // already built from it - see DECISIONS.md "Removing an asset
         // doesn't touch what's already built".
-        public ZonePrefab BuildOrRebuild(CustomZoneDefinition definition, IEnumerable<Collection> collections)
+        //
+        // Incremental, not one synchronous call - see DECISIONS.md "A
+        // 349-entry collection froze the game hard enough to need
+        // force-killing". Even after fixing the O(entries * total
+        // buildings) lookup cost, cloning hundreds of genuinely new
+        // building prefabs in one frame can still take tens of seconds
+        // (one-time engine-side asset loading per uniquely-referenced
+        // template on first use this session, confirmed by the exact
+        // same collection attaching ~7x faster the second time - not
+        // something this mod controls or can eliminate). Yielding a
+        // ZoneBuildProgress every entriesPerTick entries lets
+        // CustomZoneBuildRequestSystem spread that unavoidable cost
+        // across many frames instead of freezing one, and gives the UI
+        // something to show while it happens. CustomZoneBuildRequestSystem
+        // is the only caller - advances this exactly one step (one
+        // MoveNext()) per its own OnUpdate tick.
+        public IEnumerable<ZoneBuildProgress> BuildOrRebuildIncremental(CustomZoneDefinition definition, IEnumerable<Collection> collections, int entriesPerTick)
         {
             // See GameBuildingCatalog.InvalidateNameIndex's own comment -
             // forces a fresh by-name lookup cache for this rebuild,
@@ -81,17 +98,28 @@ namespace ZoneBuilder.CustomZones
             var internalZoneName = GetInternalZoneName(definition.Id);
 
             if (!TryGetOrCloneZone(definition, internalZoneName, out var clonedZone, out var clonedZoneEntity))
-                return null;
+                yield break;
 
             RegisterDisplayName(clonedZoneEntity, definition.Name);
             var zoneType = m_EntityManager.GetComponentData<ZoneData>(clonedZoneEntity).m_ZoneType;
 
+            // Same tick as the zone's own Created tag, deliberately not
+            // delayed even one tick - see PlatterCompatibility's own
+            // comment for why that one-tick gap is exactly what broke the
+            // first attempt at this.
+            PlatterCompatibility.NudgeZoneGroupForPlatter(clonedZone, m_PrefabSystem.World);
+
+            // Materialized up front (same data EnumerateEntries always
+            // walked, just not lazily this time) so Total is known for
+            // progress reporting from the very first yield.
+            var entries = EnumerateEntries(collections).ToList();
             var resolvedPrefabIds = new HashSet<string>();
             var clonedCount = 0;
+            var processedThisChunk = 0;
 
-            foreach (var entry in EnumerateEntries(collections))
+            for (var i = 0; i < entries.Count; i++)
             {
-                switch (entry)
+                switch (entries[i])
                 {
                     case VanillaSelectorEntry selector:
                         foreach (var candidate in m_Catalog.Resolve(selector))
@@ -146,12 +174,19 @@ namespace ZoneBuilder.CustomZones
                         Mod.log.Warn($"[CustomZoneBuilder] Skipping adopted asset '{adopted.PrefabId}' for zone '{definition.Name}' - adopted assets aren't cloneable yet (no GameAdapter gives them growable data).");
                         break;
                 }
+
+                processedThisChunk++;
+                if (processedThisChunk >= entriesPerTick && i < entries.Count - 1)
+                {
+                    processedThisChunk = 0;
+                    yield return new ZoneBuildProgress(definition.Name, i + 1, entries.Count);
+                }
             }
 
             var retiredCount = RetireBuildingsNoLongerResolved(internalZoneName, resolvedPrefabIds);
 
             Mod.log.Info($"[CustomZoneBuilder] Built/rebuilt zone '{definition.Name}': {clonedCount} newly cloned, {resolvedPrefabIds.Count} total offered, {retiredCount} retired.");
-            return clonedZone;
+            yield return new ZoneBuildProgress(definition.Name, entries.Count, entries.Count);
         }
 
         // Sixth attempt (2026-10-11) - five prior mechanisms (active=false,

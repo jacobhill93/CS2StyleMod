@@ -37,9 +37,27 @@ namespace ZoneBuilder.CustomZones
             }
         }
 
+        // How many collection entries BuildOrRebuildIncremental processes
+        // per OnUpdate tick before yielding - see its own comment for why
+        // this exists at all. Picked conservatively: even a single entry
+        // can be expensive on first use this session (engine-side asset
+        // loading, not this mod's own cost - see DECISIONS.md), so this
+        // bounds worst-case per-tick cost to roughly
+        // EntriesPerTick * (that one-time per-entry cost) rather than
+        // eliminating it outright.
+        private const int EntriesPerTick = 5;
+
         private readonly Queue<PendingRequest> m_PendingRequests = new Queue<PendingRequest>();
         private readonly Queue<Guid> m_PendingRetirements = new Queue<Guid>();
         private CustomZoneBuilder m_Builder;
+        private IEnumerator<ZoneBuildProgress> m_ActiveBuild;
+
+        // null means no build in progress - ZoneUISystem polls this every
+        // UI tick (see ExtendedUISystemBase.CreateBinding's getter
+        // overload) to drive the "building zone..." indicator. Set
+        // together with m_ActiveBuild, always - never let one change
+        // without the other.
+        public ZoneBuildProgress? CurrentProgress { get; private set; }
 
         protected override void OnCreate()
         {
@@ -72,21 +90,39 @@ namespace ZoneBuilder.CustomZones
 
         protected override void OnUpdate()
         {
-            while (m_PendingRequests.Count > 0)
+            // Advance the in-progress build exactly one step (one entry
+            // chunk) this tick, or start the next queued one - never
+            // both in the same tick, which is the entire point: bound
+            // how much of this tick a build can cost.
+            if (m_ActiveBuild != null)
+            {
+                AdvanceActiveBuild();
+            }
+            else if (m_PendingRequests.Count > 0)
             {
                 var request = m_PendingRequests.Dequeue();
-                var zone = m_Builder.BuildOrRebuild(request.Definition, request.Collections);
-
-                // Third-party compatibility shim, not part of this mod's
-                // own build pipeline - see PlatterCompatibility's own
-                // comment for what this does and why it's isolated to one
-                // file plus this single call.
-                PlatterCompatibility.NudgeZoneGroupForPlatter(zone, World);
+                m_ActiveBuild = m_Builder.BuildOrRebuildIncremental(request.Definition, request.Collections, EntriesPerTick).GetEnumerator();
+                AdvanceActiveBuild();
             }
 
+            // Cheap (one RemovePrefab each) and unrelated to any
+            // in-progress build - no reason to make these wait.
             while (m_PendingRetirements.Count > 0)
             {
                 m_Builder.RetireZone(m_PendingRetirements.Dequeue());
+            }
+        }
+
+        private void AdvanceActiveBuild()
+        {
+            if (m_ActiveBuild.MoveNext())
+            {
+                CurrentProgress = m_ActiveBuild.Current;
+            }
+            else
+            {
+                m_ActiveBuild = null;
+                CurrentProgress = null;
             }
         }
     }

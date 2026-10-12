@@ -7,6 +7,7 @@ import { generateGuid } from "shared/generateGuid";
 import { ANY, FilterDropdown } from "shared/FilterDropdown";
 import { Icons } from "shared/icons";
 import rowStyles from "shared/ListRow.module.scss";
+import styles from "./ZonesTab.module.scss";
 
 interface CollectionEntry {
     id: string;
@@ -20,6 +21,20 @@ interface ZoneEntry {
     baseZoneType: string;
     region: string;
     collectionIds: string[];
+}
+
+// Mirrors UI.ZoneBuildProgressEntry (src/UI/ZoneBuildProgressEntry.cs) -
+// a getter-based binding (see that file's comment), so this reflects
+// CustomZoneBuildRequestSystem.CurrentProgress live, every UI tick,
+// while a build/rebuild is spreading a large collection across many
+// frames rather than freezing one - see DECISIONS.md "A 349-entry
+// collection froze the game". Without this, a big attach just looks
+// like the game hung.
+interface BuildProgressEntry {
+    active: boolean;
+    zoneName: string;
+    completed: number;
+    total: number;
 }
 
 // Mirrors Core.ZoneType exactly (src/Core/Primitives.cs) - see ZonePanel's
@@ -47,6 +62,12 @@ const REGION_LABELS: Record<ZoneRegion, string> = { NorthAmerica: "NA", Europe: 
 
 const Zones$ = bindValue<ZoneEntry[]>(mod.id, "Zones", []);
 const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
+const BuildProgress$ = bindValue<BuildProgressEntry>(mod.id, "BuildProgress", {
+    active: false,
+    zoneName: "",
+    completed: 0,
+    total: 0,
+});
 
 // UI_OVERHAUL_PLAN.md Phase 2: ports ZonePanel's list/Create/delete-
 // confirmation/empty-state into the shell's Zones tab, and adds the
@@ -57,6 +78,7 @@ const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 export const ZonesTab = () => {
     const zones = useValue(Zones$);
     const collections = useValue(Collections$);
+    const buildProgress = useValue(BuildProgress$);
     const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
     const selectedZone = zones.find((z) => z.id === selectedZoneId);
@@ -68,11 +90,33 @@ export const ZonesTab = () => {
         return null;
     }
 
-    if (selectedZone) {
-        return <ZoneDetail zone={selectedZone} collections={collections} onBack={() => setSelectedZoneId(null)} />;
-    }
+    return (
+        <>
+            <BuildProgressBanner progress={buildProgress} />
+            {selectedZone ? (
+                <ZoneDetail zone={selectedZone} collections={collections} onBack={() => setSelectedZoneId(null)} />
+            ) : (
+                <ZonesList zones={zones} onSelect={setSelectedZoneId} />
+            )}
+        </>
+    );
+};
 
-    return <ZonesList zones={zones} onSelect={setSelectedZoneId} />;
+// Shown above either sub-view, not just the list, since a build can be
+// triggered from the detail view too (attaching a collection) - the
+// user shouldn't lose the indicator just because they're looking at a
+// zone's detail panel when a big one kicks off.
+const BuildProgressBanner = ({ progress }: { progress: BuildProgressEntry }) => {
+    if (!progress.active) return null;
+
+    return (
+        <div className={styles.buildProgressBanner}>
+            <div className={styles.spinner} />
+            <span className={styles.buildProgressText}>
+                Building "{progress.zoneName}"... {progress.completed}/{progress.total}
+            </span>
+        </div>
+    );
 };
 
 interface ZonesListProps {

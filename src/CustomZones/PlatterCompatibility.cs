@@ -21,8 +21,10 @@ namespace ZoneBuilder.CustomZones
     // owns) with Updated, in the same tick as the build, satisfies that.
     //
     // DELIBERATELY ISOLATED: this entire feature is this one file plus its
-    // single call site in CustomZoneBuildRequestSystem.OnUpdate. If this
-    // needs to come out later - Platter ships its own fix, a game or
+    // single call site in CustomZoneBuilder.BuildOrRebuildIncremental
+    // (right after a zone is resolved, same tick as its own Created tag -
+    // see that method's own comment). If this needs to come out later -
+    // Platter ships its own fix, a game or
     // Platter update changes the mechanics this relies on, or it turns out
     // to cause some side effect this session's testing didn't happen to
     // exercise - deleting this file and that one call is the entire
