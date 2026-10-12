@@ -1,11 +1,8 @@
 using CS2StyleMod.Core;
 using CS2StyleMod.CustomZones.GameAdapters;
 using Game;
-using Game.Common;
-using Game.Prefabs;
 using System;
 using System.Collections.Generic;
-using Unity.Entities;
 
 namespace CS2StyleMod.CustomZones
 {
@@ -42,37 +39,11 @@ namespace CS2StyleMod.CustomZones
 
         private readonly Queue<PendingRequest> m_PendingRequests = new Queue<PendingRequest>();
         private readonly Queue<Guid> m_PendingRetirements = new Queue<Guid>();
-
-        // EXPERIMENTAL (branch experiment/platter-zone-nudge, 2026-10-11,
-        // CONFIRMED WORKING IN-GAME) - see DECISIONS.md "Platter never
-        // picks up our custom zones" for the full investigation. Platter's
-        // own reactive zone cache (Platter.Systems.P_ZoneCacheSystem) only
-        // does a full, correct re-cache (reading everything fresh -
-        // m_ZonesAllQuery, not a frozen snapshot) when a
-        // UIAssetCategoryData-tagged entity has Created/Updated/Deleted AT
-        // THE SAME TIME its own zone-change query (m_ZonesModifiedQuery)
-        // is non-empty - both conditions, same tick (confirmed by testing:
-        // calling RequireAnyForUpdate twice ANDs the two groups together,
-        // not OR). Tagging the zone's own UI group (e.g.
-        // "ZonesResidential" - a widely-shared vanilla entity, not one we
-        // own) with Updated, in the SAME tick as the build (so it overlaps
-        // with the zone's own still-present Created tag), reliably
-        // triggers Platter's full re-cache. Safe for this specific
-        // purpose even though it skips the usual one-frame settling delay:
-        // this nudge never reads the zone's own state, and Platter's
-        // resulting re-cache reads zone data live when it runs, not from
-        // a snapshot taken now. Still carries the audited risk noted in
-        // DECISIONS.md - touches a shared vanilla entity's tag state every
-        // build, with no way to fully rule out some other system also
-        // watching the same generic tag reacting unexpectedly - confirmed
-        // clean across this session's testing, not provably safe forever.
         private CustomZoneBuilder m_Builder;
-        private PrefabSystem m_PrefabSystem;
 
         protected override void OnCreate()
         {
             base.OnCreate();
-            m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             m_Builder = new CustomZoneBuilder(World, new GameBuildingCatalog(World));
         }
 
@@ -105,31 +76,18 @@ namespace CS2StyleMod.CustomZones
             {
                 var request = m_PendingRequests.Dequeue();
                 var zone = m_Builder.BuildOrRebuild(request.Definition, request.Collections);
-                NudgeGroup(zone);
+
+                // Third-party compatibility shim, not part of this mod's
+                // own build pipeline - see PlatterCompatibility's own
+                // comment for what this does and why it's isolated to one
+                // file plus this single call.
+                PlatterCompatibility.NudgeZoneGroupForPlatter(zone, World);
             }
 
             while (m_PendingRetirements.Count > 0)
             {
                 m_Builder.RetireZone(m_PendingRetirements.Dequeue());
             }
-        }
-
-        // EXPERIMENTAL, see the field comment above - resolves the zone's
-        // UI group (the same UIObject.m_Group lookup RetireZone already
-        // does) and tags it Updated immediately, same tick as the build.
-        private void NudgeGroup(ZonePrefab zone)
-        {
-            if (zone == null || !zone.TryGet<UIObject>(out var uiObject) || uiObject.m_Group == null)
-                return;
-
-            if (!m_PrefabSystem.TryGetEntity(uiObject.m_Group, out var groupEntity) || !EntityManager.Exists(groupEntity))
-                return;
-
-            if (EntityManager.HasComponent<Updated>(groupEntity))
-                return;
-
-            EntityManager.AddComponent<Updated>(groupEntity);
-            Mod.log.Info($"[CustomZoneBuildRequestSystem] Experimental Platter nudge: tagged group Entity {groupEntity.Index}:{groupEntity.Version} with Updated (same tick as build).");
         }
     }
 }
