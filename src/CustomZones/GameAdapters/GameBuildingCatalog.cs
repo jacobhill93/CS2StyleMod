@@ -322,6 +322,28 @@ namespace CS2StyleMod.CustomZones.GameAdapters
         // (the inverse direction), rather than duplicating the switch.
         internal static bool TryMapToCoreZoneType(ZoneData zoneData, ZonePropertiesData zoneProps, out CoreZoneType zoneType)
         {
+            // Game.Buildings.PropertyUtils.GetZoneDensity only handles
+            // Residential/Commercial/Industrial - anything else (confirmed
+            // via decompiled source) hits a hard, uncatchable
+            // UnityEngine.Assertions.Assert.IsTrue(false, "Unknown Zone
+            // area type:...") instead of returning a sentinel. Found
+            // in-game (2026-10-11): Platter registers its own internal
+            // "PlatterUnzoned" ZonePrefab with AreaType.None, and this
+            // method's query iterates every ZoneData+PrefabData entity in
+            // the world, Platter's included - calling GetZoneDensity
+            // before this already-correct default-case rejection ever ran
+            // crashed CustomZoneBuildRequestSystem's whole OnUpdate with
+            // an AssertionException the moment Platter was installed.
+            // Guarding the call, not the switch below, which already
+            // returns false for exactly this case once it's reached.
+            if (zoneData.m_AreaType != AreaType.Residential &&
+                zoneData.m_AreaType != AreaType.Commercial &&
+                zoneData.m_AreaType != AreaType.Industrial)
+            {
+                zoneType = default;
+                return false;
+            }
+
             var density = PropertyUtils.GetZoneDensity(zoneData, zoneProps);
             var isOffice = zoneData.IsOffice();
 

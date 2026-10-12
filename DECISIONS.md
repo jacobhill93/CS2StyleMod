@@ -1260,6 +1260,100 @@ District Themes only filter naturally spawned buildings and never remove
 manually placed ones. Test alongside Plop the Growables, since both touch
 zone checks and spawning.
 
+### A collection with no Level 1 building can never spawn anything (2026-10-11)
+User report: "Lowplusmedium" had plenty of Residential Low demand, a
+collection attached, and painted cells - but nothing ever spawned, while
+vanilla zones worked fine. Not a code bug: confirmed via decompiled
+source (`Game.Simulation.ZoneSpawnSystem.SelectBuilding`,
+`if (nativeArray3[j].m_Level != 1) continue;`) that an *initial* spawn on
+an empty lot only ever considers Level 1 candidates - level-up
+(`BuildingUpkeepSystem`) only applies to a building that's already
+standing, so it can never be the thing that bootstraps an empty lot.
+"Lowplusmedium"'s collection ("Low plus medium", see `collections.json`)
+turned out to have zero Level 1 entries among its Residential Low
+buildings - every one was L2-L5. Confirmed by having the user paint a
+*different* zone ("Low," whose collection has two real L1 entries) -
+it spawned correctly. This is the same underlying mechanism as
+"Leveling gaps" below, just the more severe end of it: not "stuck
+mid-level-up," but "can never start." No code fix needed here; this is
+exactly the kind of content gap `FallbackPolicy`/a future UI warning
+could help a user catch (see "Leveling gaps" below) - worth revisiting
+once that's designed, e.g. warning when a zone's attached collections
+have no Level 1 candidate for its base type at all.
+
+### Platter (third-party mod) never picks up our custom zones (2026-10-11)
+User report, confirmed real after ruling out a code bug on our side via
+a full restart (which should have forced Platter's own unconditional
+full re-cache to see the zone, and still didn't). Decompiled `Platter.dll`
+(same ilspycmd technique used on `Game.dll`) to find the actual
+mechanism rather than guessing:
+- `Platter.Systems.P_ZoneCacheSystem.CacheZonePrefabs` builds its zone
+  picker from `ZoneData`+`PrefabData` entities, excluding any without a
+  `UIObjectData` component or whose `UIObject.m_Group` isn't a
+  `UIAssetCategoryPrefab`. Added temporary diagnostic logging in
+  `CustomZoneBuilder.BuildOrRebuild` to check both directly against our
+  own cloned zone - both passed (`HasComponent<UIObjectData>=True`,
+  group type `Game.Prefabs.UIAssetCategoryPrefab`), ruling this out.
+- `P_ZoneCacheSystem.OnCreate` calls `RequireAnyForUpdate` **twice**,
+  each with a single query (`m_ZonesModifiedQuery` - zone
+  Created/Updated/Deleted - and separately `m_UIAssetCategoryPrefabCreatedQuery`).
+  Multiple `RequireAnyForUpdate` calls AND together (confirmed
+  empirically, not just inferred from the API shape - see below): its
+  reactive `OnUpdate` only ever runs when *both* are simultaneously
+  non-empty in the same frame. Our zone-only creates/rebuilds never
+  touch a `UIAssetCategoryData`-tagged entity, so that condition is
+  essentially never satisfied by anything we do.
+- Confirmed empirically, not just reasoned from the IL: added a second
+  temporary diagnostic (a direct compile-time reference to `Platter.dll`,
+  reading its public `P_ZoneCacheSystem.ZoneUIData`/`CacheVersion`
+  properties straight from our own `BuildOrRebuild`). Across this whole
+  session - multiple zone creates, two full rebuild-on-load cycles, and
+  a detach/reattach that settled a zone's real `ZoneData.m_ZoneType`
+  index to a confirmed-correct, non-placeholder value - Platter's
+  `CacheVersion` never moved off its initial value, and `ZoneUIData`
+  never contained any of our zones, even looked up by the now-correct
+  settled index. Its reactive cache genuinely never fires for us; it
+  only ever gets populated by its own one-time `OnGameLoaded` full
+  re-cache, which races against - and apparently loses to - our own
+  `ZoneUISystem.OnGameLoaded` rebuild-on-load hook.
+- Both temporary diagnostics (the extra logging in `BuildOrRebuild` and
+  the `Platter` project reference in `CS2StyleMod.csproj`) were removed
+  once this was confirmed - a real build-time dependency on another
+  mod's DLL doesn't belong in this project, and the diagnostic call site
+  would crash for any user who doesn't have Platter installed.
+
+**Not fixed, and not clearly ours to fix**: this is an ordering race
+between two independent mods' `OnGameLoaded` hooks, plus a reactive
+cache gate on Platter's side that's narrower than "any zone change."
+Neither mod controls the other's registration order. Options, none
+taken: report upstream to Platter's author (the real fix - broaden
+`RequireAnyForUpdate` to an actual OR, or re-run `CacheZonePrefabs` once
+more a frame after load); do nothing further (documented limitation);
+or a fragile workaround on our side (e.g. tagging a `UIAssetCategoryData`
+entity `Updated` ourselves to force Platter's gate open, which depends
+on Platter's exact internal query shape and could break on its next
+update). Leaving this documented rather than building the fragile
+option.
+
+**Separately confirmed while investigating this**: `GameBuildingCatalog.TryMapToCoreZoneType`
+crashed the whole `CustomZoneBuildRequestSystem.OnUpdate` with an
+uncatchable `UnityEngine.Assertions.Assert` (`"Unknown Zone area
+type:None"`) whenever our own zone-template search
+(`GameZonePrefabResolver.TryFindVanillaZone`) happened to iterate past
+Platter's own internal "PlatterUnzoned" `ZonePrefab` (`AreaType.None`)
+before finding a real match - confirmed via `Game.Buildings.PropertyUtils.GetZoneDensity`'s
+real source, which only handles Residential/Commercial/Industrial and
+asserts on anything else instead of returning a sentinel. Non-deterministic
+in practice (depends on unstable ECS entity iteration order), which is
+why some zone creations crashed and others, created moments apart,
+didn't. Fixed by checking `m_AreaType` before ever calling
+`GetZoneDensity`, matching the intent the surrounding `switch`'s already-
+correct `default: return false` case clearly had all along - this fix
+is real and warranted regardless of the Platter investigation's outcome,
+since any other mod (or future vanilla content) registering a
+non-Residential/Commercial/Industrial `ZoneData` entity would trigger
+the identical crash.
+
 ## Prior art reviewed
 
 | Mod | Game | Relevance |
@@ -1293,7 +1387,7 @@ popularity.
 
 | Mod | Why it's in scope | Popularity | Status |
 |---|---|---|---|
-| [Platter \[Beta\]](https://mods.paradoxplaza.com/mods/125278/Windows) ([source](https://github.com/lucarager/CS2-Platter)) | Not just a risk - a desired integration: players will want to build a custom zone here, then use Platter to stamp it as a reusable parcel. Checked its actual source (`P_ZoneCacheSystem.cs`): it builds its zone picker from *every* entity with `ZoneData + PrefabData`, same generic query the game itself uses - not a hardcoded vanilla list - gated only on the prefab having a `UIObjectData` component. Since `ZonePrefabCloner` clones the whole vanilla template (UI category/icon included), our custom zones should appear in Platter's picker for free, same mechanism as Find It. **Not yet confirmed in-game.** | 136.5k subs, growing | Likely compatible (source-verified), untested in-game |
+| [Platter \[Beta\]](https://mods.paradoxplaza.com/mods/125278/Windows) ([source](https://github.com/lucarager/CS2-Platter)) | Not just a risk - a desired integration: players will want to build a custom zone here, then use Platter to stamp it as a reusable parcel. **Confirmed incompatible in-game (2026-10-11)**, contradicting the earlier source skim below - see "Platter never picks up our custom zones" above for the full investigation (decompiled, not guessed): Platter's reactive cache only updates when a `UIAssetCategoryData` entity *also* changes in the same frame, which our zone-only operations never trigger, and its one-time `OnGameLoaded` full re-cache races against our own load-time rebuild. A separate, unrelated crash (`AssertionException` on Platter's own internal "PlatterUnzoned" zone prefab) was found and fixed along the way, real regardless of the Platter question's outcome. | 136.5k subs, growing | **Confirmed incompatible** (source-verified + reproduced in-game) |
 | [Zone Organizer](https://mods.paradoxplaza.com/mods/95965/Windows) | Splits residential zoning into new sub-categories (Low/Medium/High Density, Mixed Housing) - i.e. adds new zone types, same space as Custom Zones. | 267.2k subs | Untested |
 | [Zoning Toolkit](https://mods.paradoxplaza.com/mods/75750/Windows) (retired by author, still widely installed) / [Zone Tools](https://mods.paradoxplaza.com/mods/128269/Windows) / [Easy Zoning](https://mods.paradoxplaza.com/mods/136261/Windows) (active successors, same lineage) | Per-road zoning-side control (left/right/both/none), affecting where buildings can spawn. | 115.4k / 64.6k / 18.3k subs | Untested |
 | [Plop the Growables](https://mods.paradoxplaza.com/mods/75826/Windows) | Bypasses growable zone checks, disables despawn-on-rezone. Direct overlap with Custom Zones' spawn logic (see "Compatibility with Plop the Growables" above). | 446.6k subs | Untested |
@@ -1394,16 +1488,16 @@ adapter exists.
       this mechanism isn't used by the real model.
 - [ ] **Compatibility with other mods**: the Compatibility watchlist above
       is now populated with real, researched candidates (9 mods/lineages,
-      sourced from live Paradox Mods data) - but every row is still
-      "Untested" against a real conflict (does Platter actually pick up
-      our custom zones, does a zoning-grid-rework mod break anything,
-      etc.). **Partial data point (2026-10-10)**: user loaded a real
-      playset of ~40 code mods (Node Controller among them) alongside
-      this one - no crash, no mod-loading errors from any mod. That's
-      coexistence, not a row-by-row functional check against the
-      specific candidates above (Platter picking up custom zones,
-      interaction with the zoning-grid-rework group, etc.) - still worth
-      doing individually, prioritizing that group first.
+      sourced from live Paradox Mods data) - every row besides Platter is
+      still "Untested" against a real conflict (does a zoning-grid-rework
+      mod break anything, etc.). **Partial data point (2026-10-10)**: user
+      loaded a real playset of ~40 code mods (Node Controller among them)
+      alongside this one - no crash, no mod-loading errors from any mod.
+      That's coexistence, not a row-by-row functional check - still worth
+      doing individually for the rest, prioritizing the zoning-grid-rework
+      group next. **Platter resolved (2026-10-11)**: confirmed
+      incompatible (its reactive zone cache never fires for us) - see
+      "Platter never picks up our custom zones" above.
 - [ ] Fallback policy: `Core.FallbackPolicy` now models *that* it's
       configurable (`None` vs `VanillaZone`), but not what the default
       should be, whether it's set per-collection or per-district, or what
