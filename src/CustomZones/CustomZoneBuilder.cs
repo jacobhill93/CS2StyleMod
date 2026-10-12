@@ -265,6 +265,31 @@ namespace ZoneBuilder.CustomZones
 
             var removed = m_PrefabSystem.RemovePrefab(zone);
             Mod.log.Info($"[CustomZoneBuilder] RetireZone: '{zone.name}' found (Entity {zoneEntity.Index}:{zoneEntity.Version}), PrefabSystem.RemovePrefab returned {removed}.");
+
+            // Found in-game (2026-10-11): this only ever removed the zone
+            // itself - every building BuildOrRebuildIncremental had
+            // cloned for it (named with the same internalZoneName prefix,
+            // see GetInternalBuildingName) was left registered,
+            // orphaned - BuildingSpawnGroupData pointing at a zone type
+            // that no longer exists, never offered again, but never
+            // cleaned up either. Harmless to a single retire, but
+            // repeated create/retire cycles over a long session quietly
+            // accumulate dead prefabs. Removing them the same way the
+            // zone itself is removed, not RetireBuildingsNoLongerResolved's
+            // softer "clear BuildingSpawnGroupData" approach - that one
+            // exists for a zone that's still alive and might re-resolve a
+            // building later (a collection re-attached, say), which isn't
+            // possible here since the zone this prefix belongs to is
+            // gone for good.
+            var buildingsRemoved = 0;
+            foreach (var (buildingPrefab, _) in m_Catalog.FindBuildingsByNamePrefix(GetInternalBuildingNamePrefix(internalZoneName)))
+            {
+                if (m_PrefabSystem.RemovePrefab(buildingPrefab))
+                    buildingsRemoved++;
+            }
+
+            if (buildingsRemoved > 0)
+                Mod.log.Info($"[CustomZoneBuilder] RetireZone: also removed {buildingsRemoved} building prefab(s) cloned for '{zone.name}'.");
         }
 
         private bool TryGetOrCloneZone(CustomZoneDefinition definition, string internalZoneName, out ZonePrefab clonedZone, out Entity clonedZoneEntity)

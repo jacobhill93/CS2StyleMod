@@ -59,11 +59,33 @@ unused Assets` in the same window. See "Chunked, incremental zone
 building" below for the actual mitigation - spreading the unavoidable
 cost across frames instead of trying to eliminate it.
 
-**Separately noticed, not yet fixed**: `RetireZone` only removes the
-*zone* prefab, not the buildings it had cloned - retiring a zone orphans
-its building clones rather than cleaning them up, so repeated create/
-retire cycles quietly accumulate dead prefabs over a long session. Not
-the cause of this freeze; worth a follow-up on its own.
+**Separately noticed, fixed (2026-10-11)**: `RetireZone` only removed
+the *zone* prefab, not the buildings it had cloned - retiring a zone
+orphaned its building clones rather than cleaning them up, so repeated
+create/retire cycles would quietly accumulate dead prefabs over a long
+session. Not the cause of the freeze above; fixed anyway since we were
+already in this code. `RetireZone` now also calls `PrefabSystem.RemovePrefab`
+on every building found under that zone's internal name prefix
+(`GameBuildingCatalog.FindBuildingsByNamePrefix`) - the same real removal
+API already confirmed correct for zones, not `RetireBuildingsNoLongerResolved`'s
+softer "clear BuildingSpawnGroupData" approach, since that one exists for
+a zone that's still alive and might re-resolve the building later, which
+isn't possible once the zone itself is gone.
+
+**Residual risk, not independently verified**: zone removal was already
+confirmed safe for cells already painted with that zone type
+(`Cell.m_Zone.m_Index` is a separate, zone-specific index, unrelated to
+`PrefabSystem`'s own reindexing - see above). Whether removing a
+*building* prefab is equally safe for instances of that building already
+standing/grown in the city hasn't been specifically checked the same
+way - CS2 generally has to tolerate a placed building's prefab going
+missing (e.g. unsubscribing a Workshop pack between sessions), so this
+is *expected* to be handled gracefully, but that's inference from the
+zone case and general modding precedent, not confirmed by reading the
+same kind of real decompiled-source evidence the zone case got. Worth
+testing retiring a zone that actually has grown buildings on painted
+lots, not just an empty or newly-created one, before trusting this
+fully.
 
 ### Chunked, incremental zone building, with a "building zone..." UI indicator (2026-10-11)
 Follow-up to the freeze above: once the remaining ~90s was understood to
