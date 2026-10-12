@@ -2,6 +2,28 @@
 
 ## Decisions
 
+### Platter nudge needed on delete too, not just create (2026-10-12)
+Found in-game: a deleted zone kept showing up in Platter's own zone
+list indefinitely. Root cause was predictable once spotted -
+`PlatterCompatibility.NudgeZoneGroupForPlatter` was only ever called
+from `CustomZoneBuilder.BuildOrRebuildIncremental` (the build path).
+Platter's reactive cache needs its zone-change condition *and* its
+category-change condition both non-empty in the same tick (see "Platter
+never picks up our custom zones" above); deleting a zone satisfies the
+first (the zone's own `Deleted` tag) but nothing ever satisfied the
+second, so the reactive cache never refreshed on delete and the stale
+entry just sat there until the next full game restart.
+
+Fixed by adding the same call to `CustomZoneBuilder.RetireZone`, right
+after `RemovePrefab` (same tick as the zone's own `Deleted` tag, same
+reasoning as the build-path call). Cheap to add specifically because
+the mechanism was already built, isolated, and audited - this is reuse
+of an existing, already-idempotent function from one more call site,
+not new workaround surface. `PlatterCompatibility`'s own "deliberately
+isolated" comment updated to reflect two call sites instead of one -
+still just that one file plus those two calls for a full removal if
+ever needed.
+
 ### The retire loop needed chunking too - a 349-building detach crashed the game natively (2026-10-12)
 Follow-up to chunking the clone loop: detaching a 349-building collection
 from a zone (not deleting the zone itself) crashed the game shortly
