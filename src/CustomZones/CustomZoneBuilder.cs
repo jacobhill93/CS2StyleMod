@@ -183,10 +183,39 @@ namespace ZoneBuilder.CustomZones
                 }
             }
 
-            var retiredCount = RetireBuildingsNoLongerResolved(internalZoneName, resolvedPrefabIds);
+            // Chunked the same way as the clone loop above, for the same
+            // reason - found in-game (2026-10-12): detaching a collection
+            // with 349 already-cloned buildings crashed the game shortly
+            // after, with Player.log showing a flood of "JobTempAlloc has
+            // allocations that are more than the maximum lifespan of 4
+            // frames old - this is not allowed and likely a leak"
+            // starting immediately after this exact step, followed by a
+            // native crash. This loop was still fully synchronous even
+            // after the clone loop was chunked - 349 SetSharedComponent
+            // calls in one tick (each one a structural change, since a
+            // SharedComponentData change can move an entity between ECS
+            // chunks) was apparently enough to leak a TempJob allocation
+            // the same way 349 clones in one tick used to freeze the
+            // game outright. Spreading it across frames the same way.
+            var buildingsToRetire = FindBuildingsNoLongerResolved(internalZoneName, resolvedPrefabIds);
+            var retiredCount = 0;
+            var processedRetiresThisChunk = 0;
+
+            for (var i = 0; i < buildingsToRetire.Count; i++)
+            {
+                m_EntityManager.SetSharedComponent(buildingsToRetire[i], new BuildingSpawnGroupData(default));
+                retiredCount++;
+
+                processedRetiresThisChunk++;
+                if (processedRetiresThisChunk >= entriesPerTick && i < buildingsToRetire.Count - 1)
+                {
+                    processedRetiresThisChunk = 0;
+                    yield return new ZoneBuildProgress(definition.Name, entries.Count + i + 1, entries.Count + buildingsToRetire.Count);
+                }
+            }
 
             Mod.log.Info($"[CustomZoneBuilder] Built/rebuilt zone '{definition.Name}': {clonedCount} newly cloned, {resolvedPrefabIds.Count} total offered, {retiredCount} retired.");
-            yield return new ZoneBuildProgress(definition.Name, entries.Count, entries.Count);
+            yield return new ZoneBuildProgress(definition.Name, entries.Count + buildingsToRetire.Count, entries.Count + buildingsToRetire.Count);
         }
 
         // Sixth attempt (2026-10-11) - five prior mechanisms (active=false,
@@ -368,22 +397,24 @@ namespace ZoneBuilder.CustomZones
         // this zone that didn't get resolved this round, so it stops
         // being offered for new construction. Doesn't touch the entity or
         // anything already built from it.
-        private int RetireBuildingsNoLongerResolved(string internalZoneName, HashSet<string> resolvedPrefabIds)
+        // Pure lookup, no mutation - see BuildOrRebuildIncremental's own
+        // comment for why the actual SetSharedComponent loop moved there
+        // instead of living here (needs to yield mid-loop, which this
+        // method, called once per rebuild rather than once per chunk,
+        // has no way to do).
+        private List<Entity> FindBuildingsNoLongerResolved(string internalZoneName, HashSet<string> resolvedPrefabIds)
         {
             var namePrefix = GetInternalBuildingNamePrefix(internalZoneName);
-            var retiredCount = 0;
+            var result = new List<Entity>();
 
             foreach (var (prefab, entity) in m_Catalog.FindBuildingsByNamePrefix(namePrefix))
             {
                 var templatePrefabId = prefab.name.Substring(namePrefix.Length);
-                if (resolvedPrefabIds.Contains(templatePrefabId))
-                    continue;
-
-                m_EntityManager.SetSharedComponent(entity, new BuildingSpawnGroupData(default));
-                retiredCount++;
+                if (!resolvedPrefabIds.Contains(templatePrefabId))
+                    result.Add(entity);
             }
 
-            return retiredCount;
+            return result;
         }
 
         private void RegisterDisplayName(Entity entity, string displayName)

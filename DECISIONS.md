@@ -2,6 +2,47 @@
 
 ## Decisions
 
+### The retire loop needed chunking too - a 349-building detach crashed the game natively (2026-10-12)
+Follow-up to chunking the clone loop: detaching a 349-building collection
+from a zone (not deleting the zone itself) crashed the game shortly
+after. The user's own framing ("issue when i removed the collection...
+but deleting the zone crashed") matched the log exactly: our own log
+showed a clean "0 newly cloned, 0 total offered, 349 retired" from the
+detach, then zone deletion proceeded and logged cleanly too (including
+clearing the zone tool's own selection, already-fixed) - the crash
+happened *after* that, with no exception in our own log at all. Deleting
+the zone wasn't the cause; it's just where the already-accumulating
+instability finally gave out.
+
+`Player.log` told the real story: immediately after an `Unloading 349
+unused Assets` line (same count as the retired buildings), it started
+flooding with `Internal: JobTempAlloc has allocations that are more
+than the maximum lifespan of 4 frames old - this is not allowed and
+likely a leak`, dozens of times, ending in a genuine native crash
+("Native Crash Reporting... fatal error in the mono runtime") with no
+managed stack trace - the process died too abruptly to even finish
+writing one.
+
+Root cause: `RetireBuildingsNoLongerResolved` was still fully
+synchronous even after `BuildOrRebuildIncremental` chunked the *clone*
+loop - 349 `EntityManager.SetSharedComponent` calls in one uninterrupted
+tick. A `SharedComponentData` change is a structural change (it can move
+an entity to a different ECS chunk if the new value doesn't match its
+neighbors) - doing 349 of those back-to-back, with no job-completion
+sync point between them, is apparently enough to leak a `TempJob`
+allocation the same underlying way 349 *clones* in one tick used to
+freeze the game outright before that loop was chunked.
+
+Fixed the same way: split `RetireBuildingsNoLongerResolved` into a pure
+lookup (`FindBuildingsNoLongerResolved`, no mutation) and moved the
+actual `SetSharedComponent` loop into `BuildOrRebuildIncremental`
+itself, chunked by the same `entriesPerTick`, yielding `ZoneBuildProgress`
+the same way the clone loop does. Confirmed: build succeeds, all 33
+Core tests pass. **Not yet re-tested in-game** - the real test is
+detaching a large collection again and confirming no `JobTempAlloc`
+leak warnings appear in `Player.log` and the game stays stable
+afterward, not just that it doesn't freeze during the detach itself.
+
 ### A 349-entry collection froze the game hard enough to need force-killing (2026-10-11)
 User report: attaching a collection named "Suburbs - Fisher Pass" to a
 newly created zone, on a playset with "a ton of mods and assets," froze
