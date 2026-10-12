@@ -54,27 +54,43 @@ collection to a zone and confirming the warning banner appears, "Cancel"
 truly does nothing, and "Attach Anyway" completes the attach exactly as
 before this feature existed.
 
-### Platter nudge needed on delete too, not just create (2026-10-12)
-Found in-game: a deleted zone kept showing up in Platter's own zone
-list indefinitely. Root cause was predictable once spotted -
-`PlatterCompatibility.NudgeZoneGroupForPlatter` was only ever called
-from `CustomZoneBuilder.BuildOrRebuildIncremental` (the build path).
-Platter's reactive cache needs its zone-change condition *and* its
-category-change condition both non-empty in the same tick (see "Platter
-never picks up our custom zones" above); deleting a zone satisfies the
-first (the zone's own `Deleted` tag) but nothing ever satisfied the
-second, so the reactive cache never refreshed on delete and the stale
-entry just sat there until the next full game restart.
+### Platter nudge on delete reverted - it crashes Platter's own zone cache (2026-10-12)
+Tried adding the same `PlatterCompatibility.NudgeZoneGroupForPlatter`
+call to `CustomZoneBuilder.RetireZone` (right after `RemovePrefab`, same
+tick as the zone's own `Deleted` tag) to fix deleted zones lingering in
+Platter's list - confirmed in-game that it *did* fix the lingering-list
+symptom, but it also threw a nonfatal `ArgumentOutOfRangeException` in
+Platter's own `P_ZoneCacheSystem.CacheZonePrefabs` every time.
 
-Fixed by adding the same call to `CustomZoneBuilder.RetireZone`, right
-after `RemovePrefab` (same tick as the zone's own `Deleted` tag, same
-reasoning as the build-path call). Cheap to add specifically because
-the mechanism was already built, isolated, and audited - this is reuse
-of an existing, already-idempotent function from one more call site,
-not new workaround surface. `PlatterCompatibility`'s own "deliberately
-isolated" comment updated to reflect two call sites instead of one -
-still just that one file plus those two calls for a full removal if
-ever needed.
+Root cause, confirmed by reading both sides' decompiled source (not
+guessed): `PrefabSystem.RemovePrefab` (`D:\CS2-Decompiled\Game.Prefabs\
+PrefabSystem.cs`) is fully synchronous - it correctly re-indexes
+whichever prefab got swapped into the removed slot, but the *removed*
+entity itself isn't destroyed yet (still tagged `Deleted`, cleaned up
+later), and its own `PrefabData.m_Index` is set to a sentinel,
+`-1000000000`. Platter's `P_ZoneCacheSystem`'s zone queries
+(`m_ZonesAllQuery`/`m_ZonesModifiedQuery`) don't exclude `Deleted`
+entities - normally harmless, since by the time Platter's own cache
+naturally refreshes the entity would already be fully destroyed and
+just wouldn't match. Our nudge defeats that: it forces Platter to
+rescan in the exact same tick as the removal, the one window where the
+entity still exists with that invalid sentinel index, and Platter's
+`PrefabSystem.GetPrefab<T>` call on it indexes `m_Prefabs[-1000000000]`
+and throws.
+
+This is a real, reproducible gap in Platter's own query (missing
+`WithNone<Deleted>()`), not something fixable from our side without
+reaching into Platter's code - and reaching in is exactly the kind of
+workaround surface this project avoids for a dependency it doesn't own.
+Reverted the delete-side nudge call; the create-side nudge (which has
+no equivalent issue - a freshly-added prefab was never tagged `Deleted`)
+stays as-is. Documented as a known gap: **deleted zones still linger in
+Platter's own list until Platter's cache next refreshes on its own
+(e.g. next load)** - acceptable, matches the user's original comfort
+level ("I may be ok with that - we can be too crazy working around
+platter code"). Worth flagging to Platter's author as a courtesy, same
+as the original create-side report, since the underlying missing-
+`Deleted`-exclusion bug is real regardless of us.
 
 ### The retire loop needed chunking too - a 349-building detach crashed the game natively (2026-10-12)
 Follow-up to chunking the clone loop: detaching a 349-building collection
@@ -1701,7 +1717,7 @@ popularity.
 
 | Mod | Why it's in scope | Popularity | Status |
 |---|---|---|---|
-| [Platter \[Beta\]](https://mods.paradoxplaza.com/mods/125278/Windows) ([source](https://github.com/lucarager/CS2-Platter)) | Not just a risk - a desired integration: players will want to build a custom zone here, then use Platter to stamp it as a reusable parcel. **Confirmed incompatible in-game (2026-10-11)**, contradicting the earlier source skim below - see "Platter never picks up our custom zones" above for the full investigation (decompiled, not guessed): Platter's reactive cache only updates when a `UIAssetCategoryData` entity *also* changes in the same frame, which our zone-only operations never trigger, and its one-time `OnGameLoaded` full re-cache races against our own load-time rebuild. A separate, unrelated crash (`AssertionException` on Platter's own internal "PlatterUnzoned" zone prefab) was found and fixed along the way, real regardless of the Platter question's outcome. | 136.5k subs, growing | **Confirmed incompatible** (source-verified + reproduced in-game) |
+| [Platter \[Beta\]](https://mods.paradoxplaza.com/mods/125278/Windows) ([source](https://github.com/lucarager/CS2-Platter)) | Not just a risk - a desired integration: players will want to build a custom zone here, then use Platter to stamp it as a reusable parcel. **Confirmed incompatible in-game (2026-10-11)**, contradicting the earlier source skim below - see "Platter never picks up our custom zones" above for the full investigation (decompiled, not guessed): Platter's reactive cache only updates when a `UIAssetCategoryData` entity *also* changes in the same frame, which our zone-only operations never trigger, and its one-time `OnGameLoaded` full re-cache races against our own load-time rebuild. A separate, unrelated crash (`AssertionException` on Platter's own internal "PlatterUnzoned" zone prefab) was found and fixed along the way, real regardless of the Platter question's outcome. **Update (2026-10-12)**: the `PlatterCompatibility` nudge fixed the create path - confirmed in-game, new custom zones now appear in Platter's list immediately. The same nudge on the *delete* path was tried, confirmed it fixed deleted zones lingering in Platter's list, but also confirmed to throw a nonfatal `ArgumentOutOfRangeException` in Platter's own `P_ZoneCacheSystem` every time (see "Platter nudge on delete reverted" above) - reverted. **Known, accepted gap: deleted zones still linger in Platter's own list until Platter's cache next refreshes on its own** (e.g. next load). | 136.5k subs, growing | **Partially compatible**: create confirmed working; delete has a known, accepted display-only gap (not pursued further - the fix requires changes on Platter's side, not ours) |
 | [Zone Organizer](https://mods.paradoxplaza.com/mods/95965/Windows) | Splits residential zoning into new sub-categories (Low/Medium/High Density, Mixed Housing) - i.e. adds new zone types, same space as Custom Zones. | 267.2k subs | Untested |
 | [Zoning Toolkit](https://mods.paradoxplaza.com/mods/75750/Windows) (retired by author, still widely installed) / [Zone Tools](https://mods.paradoxplaza.com/mods/128269/Windows) / [Easy Zoning](https://mods.paradoxplaza.com/mods/136261/Windows) (active successors, same lineage) | Per-road zoning-side control (left/right/both/none), affecting where buildings can spawn. | 115.4k / 64.6k / 18.3k subs | Untested |
 | [Plop the Growables](https://mods.paradoxplaza.com/mods/75826/Windows) | Bypasses growable zone checks, disables despawn-on-rezone. Direct overlap with Custom Zones' spawn logic (see "Compatibility with Plop the Growables" above). | 446.6k subs | Untested |

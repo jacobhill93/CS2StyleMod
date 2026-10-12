@@ -20,20 +20,16 @@ namespace ZoneBuilder.CustomZones
     // "ZonesResidential" - a widely-shared vanilla entity, not one this mod
     // owns) with Updated, in the same tick as the build, satisfies that.
     //
-    // DELIBERATELY ISOLATED: this entire feature is this one file plus two
-    // call sites - CustomZoneBuilder.BuildOrRebuildIncremental (right
-    // after a zone is resolved, same tick as its own Created tag) and
-    // CustomZoneBuilder.RetireZone (right after RemovePrefab, same tick
-    // as the zone's own Deleted tag - added 2026-10-12 after a deleted
-    // zone was found still sitting in Platter's own list, since the
-    // build-path call alone only ever satisfied Platter's zone-change
-    // condition on create, never on delete). If this needs to come out
-    // later - Platter ships its own fix, a game or Platter update changes
-    // the mechanics this relies on, or it turns out to cause some side
-    // effect this session's testing didn't happen to exercise - deleting
-    // this file and those two calls is the entire removal. No fields,
-    // state, or other call sites anywhere else in the codebase depend on
-    // this existing.
+    // DELIBERATELY ISOLATED: this entire feature is this one file plus its
+    // single call site in CustomZoneBuilder.BuildOrRebuildIncremental
+    // (right after a zone is resolved, same tick as its own Created tag -
+    // see that method's own comment). If this needs to come out later -
+    // Platter ships its own fix, a game or
+    // Platter update changes the mechanics this relies on, or it turns out
+    // to cause some side effect this session's testing didn't happen to
+    // exercise - deleting this file and that one call is the entire
+    // removal. No fields, state, or other call sites anywhere else in the
+    // codebase depend on this existing.
     internal static class PlatterCompatibility
     {
         public static void NudgeZoneGroupForPlatter(ZonePrefab zone, World world)
@@ -51,7 +47,7 @@ namespace ZoneBuilder.CustomZones
                 return;
 
             entityManager.AddComponent<Updated>(groupEntity);
-            Mod.log.Info($"[PlatterCompatibility] Tagged zone group Entity {groupEntity.Index}:{groupEntity.Version} with Updated so Platter's own zone cache notices it.");
+            Mod.log.Info($"[PlatterCompatibility] Tagged zone group Entity {groupEntity.Index}:{groupEntity.Version} with Updated (same tick as build) so Platter's own zone cache notices it.");
         }
     }
 }

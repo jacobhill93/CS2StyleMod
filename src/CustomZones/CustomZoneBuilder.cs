@@ -332,16 +332,6 @@ namespace ZoneBuilder.CustomZones
             var removed = m_PrefabSystem.RemovePrefab(zone);
             Mod.log.Info($"[CustomZoneBuilder] RetireZone: '{zone.name}' found (Entity {zoneEntity.Index}:{zoneEntity.Version}), PrefabSystem.RemovePrefab returned {removed}.");
 
-            // Same tick as the zone's own Deleted tag (just added by
-            // RemovePrefab above), same reasoning as the build-path call
-            // in BuildOrRebuildIncremental - see PlatterCompatibility's
-            // own comment. Without this, deleting a zone satisfies
-            // Platter's zone-change condition but not its paired
-            // category-change condition, so its reactive cache never
-            // refreshes and the deleted zone just sits in its list until
-            // the next full game restart - found in-game (2026-10-12).
-            PlatterCompatibility.NudgeZoneGroupForPlatter(zone, m_PrefabSystem.World);
-
             // REVERTED (2026-10-12) - a prior version of this method also
             // called PrefabSystem.RemovePrefab on every building cloned
             // for this zone (found via FindBuildingsByNamePrefix), to stop
