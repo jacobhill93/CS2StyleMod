@@ -1,4 +1,4 @@
-﻿namespace CS2StyleMod.Core
+﻿namespace ZoneBuilder.Core
 {
     // Mirrors the vanilla zone categories. Values/membership unverified against
     // game code yet - see DECISIONS.md's open questions.

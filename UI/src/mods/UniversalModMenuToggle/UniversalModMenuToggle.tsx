@@ -14,7 +14,7 @@ export const UniversalModMenuToggle = () => {
     const visible = useValue(shellVisible$);
     return (
         <Button variant="flat" selected={visible} onSelect={toggleShell}>
-            CS2StyleMod
+            ZoneBuilder
         </Button>
     );
 };

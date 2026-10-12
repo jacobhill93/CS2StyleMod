@@ -62,7 +62,7 @@ export const ShellFeature = () => {
 
     return (
         <div className={classNames(styles.shell, styles[`fpsLevel${fpsMeterLevel}`])}>
-            <Panel header={<div className={styles.header}>CS2StyleMod</div>} onClose={closeShell}>
+            <Panel header={<div className={styles.header}>ZoneBuilder</div>} onClose={closeShell}>
                 <div className={styles.tabs}>
                     {TABS.map((tab) => (
                         <Button

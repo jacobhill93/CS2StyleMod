@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // A persisted, user-defined custom zone: a base vanilla zone category
     // plus the Collection(s) whose buildings it should offer. Identity is

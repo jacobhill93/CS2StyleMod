@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // The global, cross-save library of custom zone definitions - same
     // persistence shape as ICollectionLibrary, and for the same reason

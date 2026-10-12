@@ -1,6 +1,6 @@
 ﻿using Game.Prefabs;
 
-namespace CS2StyleMod.CustomZones.GameAdapters
+namespace ZoneBuilder.CustomZones.GameAdapters
 {
     // Touchpoint: PrefabSystem.AddPrefab + PrefabBase.Clone - the same
     // mechanism the game's own editor tooling uses to duplicate prefabs.

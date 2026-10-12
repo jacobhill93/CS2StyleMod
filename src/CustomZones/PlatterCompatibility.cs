@@ -2,7 +2,7 @@ using Game.Common;
 using Game.Prefabs;
 using Unity.Entities;
 
-namespace CS2StyleMod.CustomZones
+namespace ZoneBuilder.CustomZones
 {
     // Third-party compatibility shim for Platter
     // (https://mods.paradoxplaza.com/mods/125278) - see DECISIONS.md

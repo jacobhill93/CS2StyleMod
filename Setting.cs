@@ -4,9 +4,9 @@ using Game.Modding;
 using Game.Settings;
 using System.Collections.Generic;
 
-namespace CS2StyleMod
+namespace ZoneBuilder
 {
-    [FileLocation(nameof(CS2StyleMod))]
+    [FileLocation(nameof(ZoneBuilder))]
     [SettingsUIGroupOrder(kFeaturesGroup)]
     [SettingsUIShowGroupName(kFeaturesGroup)]
     public class Setting : ModSetting
@@ -44,7 +44,7 @@ namespace CS2StyleMod
         {
             return new Dictionary<string, string>
             {
-                { m_Setting.GetSettingsLocaleID(), "CS2StyleMod" },
+                { m_Setting.GetSettingsLocaleID(), "Zone Builder" },
                 { m_Setting.GetOptionTabLocaleID(Setting.kSection), "Main" },
                 { m_Setting.GetOptionGroupLocaleID(Setting.kFeaturesGroup), "Features" },
 

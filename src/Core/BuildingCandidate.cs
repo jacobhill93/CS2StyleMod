@@ -1,4 +1,4 @@
-﻿namespace CS2StyleMod.Core
+﻿namespace ZoneBuilder.Core
 {
     // A plain, game-independent description of a building that could spawn on
     // a lot - resolved from a CollectionEntry by an IBuildingCatalog.

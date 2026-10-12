@@ -3,9 +3,9 @@ using Game.Prefabs;
 using Game.Zones;
 using Unity.Collections;
 using Unity.Entities;
-using CoreZoneType = CS2StyleMod.Core.ZoneType;
+using CoreZoneType = ZoneBuilder.Core.ZoneType;
 
-namespace CS2StyleMod.CustomZones.GameAdapters
+namespace ZoneBuilder.CustomZones.GameAdapters
 {
     // Resolves ZonePrefabs against the live game - either a vanilla zone
     // matching a Core.ZoneType category (to use as a custom zone's

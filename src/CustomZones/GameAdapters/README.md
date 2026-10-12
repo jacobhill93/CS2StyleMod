@@ -62,7 +62,7 @@ for the same timing reason as above.
 
 **Rebuild-safe by construction (2026-10-08)**: every zone/building prefab
 this builds gets a name derived from `CustomZoneDefinition.Id`
-(`CS2StyleMod.Zone.<guid>[.<template prefab name>]`), never from its
+(`ZoneBuilder.Zone.<guid>[.<template prefab name>]`), never from its
 user-facing `Name` - so calling `BuildOrRebuild` again for the same
 definition (e.g. after editing one of its Collections) finds what it built
 before by that stable name instead of creating a duplicate. A building

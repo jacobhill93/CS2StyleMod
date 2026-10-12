@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using CS2StyleMod.Core;
+using ZoneBuilder.Core;
 
-namespace CS2StyleMod.Core.Tests
+namespace ZoneBuilder.Core.Tests
 {
     // In-memory stand-in for the real game-prefab-backed catalog.
     internal sealed class FakeBuildingCatalog : IBuildingCatalog

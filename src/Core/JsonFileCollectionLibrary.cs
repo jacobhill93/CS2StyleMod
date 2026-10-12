@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // File-backed ICollectionLibrary. Pure BCL + Newtonsoft.Json - no game
     // dependency, so it's unit-testable by pointing it at a temp file. The

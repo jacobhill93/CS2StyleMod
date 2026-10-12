@@ -1,6 +1,6 @@
 ﻿using Game.Prefabs;
 
-namespace CS2StyleMod.CustomZones.GameAdapters
+namespace ZoneBuilder.CustomZones.GameAdapters
 {
     // Touchpoint: SpawnableBuilding.m_ZoneType (a ZonePrefab reference) +
     // PrefabSystem.AddPrefab. This is what makes a building belong to a

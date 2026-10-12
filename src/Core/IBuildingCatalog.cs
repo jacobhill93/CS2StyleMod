@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // Resolves collection entries into concrete buildings. Implemented by a
     // GameAdapter against real game prefabs; fakeable in unit tests so

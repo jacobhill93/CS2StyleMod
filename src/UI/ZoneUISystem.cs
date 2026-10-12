@@ -1,11 +1,11 @@
 using Colossal.Serialization.Entities;
-using CS2StyleMod.Core;
-using CS2StyleMod.CustomZones;
+using ZoneBuilder.Core;
+using ZoneBuilder.CustomZones;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CS2StyleMod.UI
+namespace ZoneBuilder.UI
 {
     // Exposes Mod.CustomZoneDefinitionLibrary to the UI - list, create,
     // rename, delete, and attach/detach Collections. Every mutation here

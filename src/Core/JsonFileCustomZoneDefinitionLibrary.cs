@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // File-backed ICustomZoneDefinitionLibrary. Pure BCL + Newtonsoft.Json -
     // no game dependency, mirrors JsonFileCollectionLibrary exactly. Stored

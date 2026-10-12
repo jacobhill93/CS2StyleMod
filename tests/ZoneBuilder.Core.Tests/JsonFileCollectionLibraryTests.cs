@@ -1,10 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using CS2StyleMod.Core;
+using ZoneBuilder.Core;
 using Xunit;
 
-namespace CS2StyleMod.Core.Tests
+namespace ZoneBuilder.Core.Tests
 {
     public class JsonFileCollectionLibraryTests : IDisposable
     {

@@ -1,6 +1,6 @@
 using Colossal.UI.Binding;
 
-namespace CS2StyleMod.UI
+namespace ZoneBuilder.UI
 {
     // Plain DTO for the UI, mirrors CollectionUIEntry's role for
     // CustomZoneDefinition. collectionIds (not just a count) is needed so

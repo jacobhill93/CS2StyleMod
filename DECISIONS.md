@@ -2,6 +2,47 @@
 
 ## Decisions
 
+### Renamed the mod from CS2StyleMod to Zone Builder (2026-10-11)
+User settled on a name. Code-level scope only this pass (per explicit
+instruction) - the C# namespace, mod id, deployed folder name, UI
+bindings, and every internal reference, but deliberately not the local
+project directory (`C:\Users\Jacob H\CS2StyleMod`) or the GitHub repo
+name, both lower-risk to leave alone for now.
+
+`ZoneBuilder` (no space) is the code-level identifier everywhere it has
+to be one: namespace, mod id (`UI/mod.json`), both `.csproj` files and
+the tests project folder, `CustomZoneBuilder.NamePrefix` (cloned prefabs
+are now named `"ZoneBuilder.Zone.<guid>"`), and every doc reference to
+an actual file/namespace path. `"Zone Builder"` (with the space) is used
+only in the two places actually shown to a person: the in-game Options
+menu title (`Setting.cs`'s `LocaleEN`) and the Paradox Mods listing name
+(`PublishConfiguration.xml`'s `DisplayName`) - plus this README's own
+title, for the same reason.
+
+Migrated `ModsData/CS2StyleMod/` (the persisted `collections.json`/
+`customZones.json`) to `ModsData/ZoneBuilder/` by copying rather than
+moving, so the old folder survives untouched as a rollback point if
+anything about the new path turns out wrong. Deleted the stale deployed
+`Mods/CS2StyleMod/` folder so the game wouldn't see two copies of the
+same mod after the rebuild.
+
+One accepted, one-time side effect: since `NamePrefix` changed, every
+zone/building prefab this mod had already cloned under the old
+`"CS2StyleMod.Zone."`/`"CS2StyleMod.Building."`-style internal names
+won't be found by name-matching lookups (`GameZonePrefabResolver.TryFindByName`)
+under the new prefix - they'll each get freshly re-cloned under the new
+name on next rebuild, leaving the old-named entities orphaned for that
+session rather than reused. Acceptable for a pre-release, not-yet-
+published mod being tested locally; would need a real migration path if
+this happened after release.
+
+Deliberately NOT renamed: `Properties/PublishConfiguration.xml`'s
+`ExternalLink` still points at `github.com/jacobhill93/CS2StyleMod` -
+that's the real, currently-existing repo; the blanket rename script
+touched it too and it was manually reverted, since actually renaming the
+GitHub repo (or the local directory) is a separate decision the user
+hasn't made yet.
+
 ### The real bug: zones were never rebuilt on a fresh game load (2026-10-11)
 What looked like three separate reports (a zone disappearing, a deleted
 zone not disappearing, persistence confusion) turned out to trace back
@@ -442,7 +483,7 @@ describes is real, but it's a compact widget tray, not meaningful real
 estate - nowhere near enough for `ShellFeature`'s tabs/filters/lists.
 
 **Conclusion**: don't migrate `ShellFeature`'s actual content onto this
-hook. Worth revisiting only as a *trigger* (a small "open CS2StyleMod"
+hook. Worth revisiting only as a *trigger* (a small "open ZoneBuilder"
 entry that toggles the real panel's visibility elsewhere), not as the
 container for it - see the open question below for what that would
 need.
@@ -815,7 +856,7 @@ file). Same rename-free principle applies, for a sharper reason than
 Collections: the in-game zone/building prefabs this builds need a name
 that's stable across renames, or a rename would orphan everything already
 built under the old name. `CustomZoneBuilder` derives that internal name
-from `CustomZoneDefinition.Id` (`CS2StyleMod.Zone.<guid>[.<template name>]`),
+from `CustomZoneDefinition.Id` (`ZoneBuilder.Zone.<guid>[.<template name>]`),
 never from `Name` - see its own comments.
 
 ### Rebuilding a custom zone is additive; removing an asset doesn't touch what's already built
@@ -956,7 +997,7 @@ reflection, `UpdateZoneColors()`) is the real systems' job again.
 `BuildingPickerUISystem` (the building-picker backend, chunk 2) originally
 called `GameBuildingCatalog.GetAllBuildings()` once in `OnCreate` and bound
 the result directly. In-game, the panel rendered with a header and nothing
-else - no exception anywhere in `CS2StyleMod.Mod.log`, just silently zero
+else - no exception anywhere in `ZoneBuilder.Mod.log`, just silently zero
 rows. Root cause: `Game.UI.UISystemBase` derives from `Game.GameSystemBase`
 (confirmed via reflection on `Game.dll`) same as every ordinary game system,
 and `OnCreate` runs at world bootstrap, before `PrefabSystem` has registered
@@ -991,7 +1032,7 @@ popups layer above each other and the rest of the panel correctly.
 **Lesson for any future UI work**: a broken mod panel is not necessarily
 contained to that panel - verify new, previously-unused host elements
 (raw HTML tags, not `cs2/ui` components) carefully, and `UI.log` (not just
-`CS2StyleMod.Mod.log`) is where a render-time JS exception actually shows
+`ZoneBuilder.Mod.log`) is where a render-time JS exception actually shows
 up, with a full stack trace.
 
 Also found and worked around in the same pass: `cs2/ui`'s own ambient type
@@ -1033,7 +1074,7 @@ was first created, just never used - every panel to date used inline
 scss.d.ts`, a `*.module.scss` module declaration for TypeScript) and
 converted `ResizeHandle` as a deliberately small, isolated proof of concept
 - gave it a real `:hover` state (impossible before), confirmed at the
-BUILD level: webpack emits a real `CS2StyleMod.css` with correctly scoped
+BUILD level: webpack emits a real `ZoneBuilder.css` with correctly scoped
 class names (`.handle_Byk` etc.), it deploys alongside the `.mjs`, and
 `hasCSS` is present in the built output.
 
@@ -1116,7 +1157,7 @@ Tried making all four panels draggable (`cs2/ui`'s first-party `draggable`/
 `initialPosition` props, confirmed real via `UI/types/ui.d.ts`) and
 resizable (hand-built corner handle, no first-party support exists for
 that). In-game: the game's own bottom ribbon moved to mid-screen
-immediately on load, with no exception in `CS2StyleMod.Mod.log` or
+immediately on load, with no exception in `ZoneBuilder.Mod.log` or
 `UI.log` - a silent layout side effect, not a crash. First fix attempt
 (removing a speculative `position: "relative"` override added alongside
 the resize handle) fixed the ribbon but then our own panels stopped
@@ -1317,7 +1358,7 @@ mechanism rather than guessing:
   re-cache, which races against - and apparently loses to - our own
   `ZoneUISystem.OnGameLoaded` rebuild-on-load hook.
 - Both temporary diagnostics (the extra logging in `BuildOrRebuild` and
-  the `Platter` project reference in `CS2StyleMod.csproj`) were removed
+  the `Platter` project reference in `ZoneBuilder.csproj`) were removed
   once this was confirmed - a real build-time dependency on another
   mod's DLL doesn't belong in this project, and the diagnostic call site
   would crash for any user who doesn't have Platter installed.

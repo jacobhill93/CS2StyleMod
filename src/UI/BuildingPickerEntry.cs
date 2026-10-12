@@ -1,6 +1,6 @@
 using Colossal.UI.Binding;
 
-namespace CS2StyleMod.UI
+namespace ZoneBuilder.UI
 {
     // Plain DTO for the UI, mirrors GameAdapters.BuildingBrowserEntry across
     // the binding boundary. assetPackIds is written as a real JSON array

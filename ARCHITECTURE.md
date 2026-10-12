@@ -30,7 +30,7 @@ UI/                    the mod's actual UI (TypeScript/React) - a separate
                        confirmed against Find It/JadHajjar-FindIt-CSII,
                        not the original per-feature-nested guess).
                        `dotnet build` also runs its webpack build (see
-                       CS2StyleMod.csproj's BuildUI target), so there's
+                       ZoneBuilder.csproj's BuildUI target), so there's
                        still one build command for the whole mod.
   src/mods/ShellFeature/
                        the one registered UI shell (fixed-position,

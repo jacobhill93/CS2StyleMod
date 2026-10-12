@@ -1,9 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using CS2StyleMod.Core;
+using ZoneBuilder.Core;
 using Xunit;
 
-namespace CS2StyleMod.Core.Tests
+namespace ZoneBuilder.Core.Tests
 {
     public class CandidateFilterTests
     {

@@ -1,5 +1,5 @@
 ﻿using Colossal.Entities;
-using CS2StyleMod.Core;
+using ZoneBuilder.Core;
 using Game.Buildings;
 using Game.Prefabs;
 using Game.Zones;
@@ -8,9 +8,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Entities;
-using CoreZoneType = CS2StyleMod.Core.ZoneType;
+using CoreZoneType = ZoneBuilder.Core.ZoneType;
 
-namespace CS2StyleMod.CustomZones.GameAdapters
+namespace ZoneBuilder.CustomZones.GameAdapters
 {
     // Real Core.IBuildingCatalog implementation: resolves Core's
     // game-independent CollectionEntry kinds against the live game's

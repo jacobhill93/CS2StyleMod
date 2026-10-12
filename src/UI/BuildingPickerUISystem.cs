@@ -1,9 +1,9 @@
 using Colossal.Serialization.Entities;
-using CS2StyleMod.CustomZones.GameAdapters;
+using ZoneBuilder.CustomZones.GameAdapters;
 using Game;
 using System.Linq;
 
-namespace CS2StyleMod.UI
+namespace ZoneBuilder.UI
 {
     // Exposes GameBuildingCatalog.GetAllBuildings() to the UI for the
     // building picker. Bare list only - no search/filter trigger bindings

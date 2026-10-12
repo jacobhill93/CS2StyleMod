@@ -1,6 +1,6 @@
 using Colossal;
-using CS2StyleMod.Core;
-using CS2StyleMod.CustomZones.GameAdapters;
+using ZoneBuilder.Core;
+using ZoneBuilder.CustomZones.GameAdapters;
 using Game.Prefabs;
 using Game.SceneFlow;
 using Game.Tools;
@@ -9,7 +9,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Entities;
 
-namespace CS2StyleMod.CustomZones
+namespace ZoneBuilder.CustomZones
 {
     // Feature logic for Custom Zones - the first thing above the
     // GameAdapters layer. Turns a CustomZoneDefinition into an actual
@@ -35,7 +35,7 @@ namespace CS2StyleMod.CustomZones
         // Prefix for every prefab this builder registers - keeps our
         // clones trivially distinguishable from vanilla/other-mod prefabs
         // by name alone, and namespaces the internal naming scheme below.
-        private const string NamePrefix = "CS2StyleMod.Zone.";
+        private const string NamePrefix = "ZoneBuilder.Zone.";
 
         private readonly PrefabSystem m_PrefabSystem;
         private readonly PrefabUISystem m_PrefabUISystem;

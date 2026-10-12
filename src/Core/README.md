@@ -26,8 +26,8 @@ spawn code lives here — see `../CustomZones/GameAdapters` and
   `Collection`, stored in its own file. What actually turns one into an
   in-game zone lives in `../CustomZones/CustomZoneBuilder.cs`.
 
-All unit-tested without the game in `../../tests/CS2StyleMod.Core.Tests`
-(run with `dotnet test tests/CS2StyleMod.Core.Tests`).
+All unit-tested without the game in `../../tests/ZoneBuilder.Core.Tests`
+(run with `dotnet test tests/ZoneBuilder.Core.Tests`).
 
 Not yet wired to anything real: nothing calls `ICollectionLibrary` from
 in-game UI yet, and no GameAdapter implements `IBuildingCatalog`. The

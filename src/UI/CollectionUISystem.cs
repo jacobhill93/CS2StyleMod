@@ -1,8 +1,8 @@
-using CS2StyleMod.Core;
+using ZoneBuilder.Core;
 using System;
 using System.Linq;
 
-namespace CS2StyleMod.UI
+namespace ZoneBuilder.UI
 {
     // Exposes Mod.CollectionLibrary to the UI - list, create, rename,
     // delete, and (via the building picker) add/remove buildings.

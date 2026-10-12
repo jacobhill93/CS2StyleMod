@@ -12,7 +12,7 @@
 // notice and this permission notice shall be included in all copies or
 // substantial portions of the Software.
 //
-// Adaptations for CS2StyleMod: namespace, the Group constant in place of
+// Adaptations for ZoneBuilder: namespace, the Group constant in place of
 // RoadBuilder's own Mod.Id. Confirmed against this project's own installed
 // game DLLs (not assumed) that every API this depends on actually exists
 // here too: Colossal.Reflection.ReflectionUtils.HasAttribute<T>(this
@@ -42,11 +42,11 @@ using Unity.Entities;
 
 using UnityEngine;
 
-namespace CS2StyleMod.UI
+namespace ZoneBuilder.UI
 {
     public abstract partial class ExtendedUISystemBase : UISystemBase
     {
-        private const string Group = nameof(CS2StyleMod);
+        private const string Group = nameof(ZoneBuilder);
 
         private readonly List<Action> _updateCallbacks = new();
 

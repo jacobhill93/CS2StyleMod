@@ -1,6 +1,6 @@
-using CS2StyleMod.Core;
+using ZoneBuilder.Core;
 
-namespace CS2StyleMod.CustomZones.GameAdapters
+namespace ZoneBuilder.CustomZones.GameAdapters
 {
     // Richer than Core.BuildingCandidate on purpose - this is pure browse/
     // display data for the building picker UI (name, zone/level/lot size

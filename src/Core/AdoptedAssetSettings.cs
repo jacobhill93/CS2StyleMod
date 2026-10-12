@@ -1,4 +1,4 @@
-﻿namespace CS2StyleMod.Core
+﻿namespace ZoneBuilder.Core
 {
     // Mod-supplied growable metadata for a building that isn't growable on its
     // own (e.g. a downloaded house with no zone), so it can spawn naturally

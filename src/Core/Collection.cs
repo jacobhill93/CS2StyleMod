@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // A named, user-defined set of buildings - the shared building block
     // behind both Custom Zones and District Themes. Identity is Id, not

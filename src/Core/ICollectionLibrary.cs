@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // The global, cross-save collection library - see DECISIONS.md
     // ("Collections persist in a global library, referenced by GUID").

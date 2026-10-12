@@ -1,10 +1,10 @@
-using CS2StyleMod.Core;
-using CS2StyleMod.CustomZones.GameAdapters;
+using ZoneBuilder.Core;
+using ZoneBuilder.CustomZones.GameAdapters;
 using Game;
 using System;
 using System.Collections.Generic;
 
-namespace CS2StyleMod.CustomZones
+namespace ZoneBuilder.CustomZones
 {
     // Owns the one timing requirement CustomZoneBuilder has: a
     // runtime-cloned prefab is only visible to the game's own

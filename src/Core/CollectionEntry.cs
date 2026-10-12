@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     // One entry in a Collection. See the three kinds in README.md's
     // "Collections (core)" section.

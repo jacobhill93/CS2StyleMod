@@ -1,4 +1,4 @@
-# CS2StyleMod
+# Zone Builder
 
 A Cities: Skylines II mod for controlling **which buildings grow where**.
 

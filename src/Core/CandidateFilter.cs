@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 
-namespace CS2StyleMod.Core
+namespace ZoneBuilder.Core
 {
     public readonly struct LotQuery
     {
