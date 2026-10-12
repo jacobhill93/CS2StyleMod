@@ -3,7 +3,6 @@ using CS2StyleMod.CustomZones.GameAdapters;
 using Game;
 using System;
 using System.Collections.Generic;
-using Unity.Entities;
 
 namespace CS2StyleMod.CustomZones
 {
@@ -76,7 +75,13 @@ namespace CS2StyleMod.CustomZones
             while (m_PendingRequests.Count > 0)
             {
                 var request = m_PendingRequests.Dequeue();
-                m_Builder.BuildOrRebuild(request.Definition, request.Collections);
+                var zone = m_Builder.BuildOrRebuild(request.Definition, request.Collections);
+
+                // Third-party compatibility shim, not part of this mod's
+                // own build pipeline - see PlatterCompatibility's own
+                // comment for what this does and why it's isolated to one
+                // file plus this single call.
+                PlatterCompatibility.NudgeZoneGroupForPlatter(zone, World);
             }
 
             while (m_PendingRetirements.Count > 0)

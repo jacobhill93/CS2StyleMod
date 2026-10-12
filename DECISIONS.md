@@ -1322,18 +1322,42 @@ mechanism rather than guessing:
   mod's DLL doesn't belong in this project, and the diagnostic call site
   would crash for any user who doesn't have Platter installed.
 
-**Not fixed, and not clearly ours to fix**: this is an ordering race
-between two independent mods' `OnGameLoaded` hooks, plus a reactive
-cache gate on Platter's side that's narrower than "any zone change."
-Neither mod controls the other's registration order. Options, none
-taken: report upstream to Platter's author (the real fix - broaden
-`RequireAnyForUpdate` to an actual OR, or re-run `CacheZonePrefabs` once
-more a frame after load); do nothing further (documented limitation);
-or a fragile workaround on our side (e.g. tagging a `UIAssetCategoryData`
-entity `Updated` ourselves to force Platter's gate open, which depends
-on Platter's exact internal query shape and could break on its next
-update). Leaving this documented rather than building the fragile
-option.
+**Update (2026-10-11): fixed, via the fragile workaround - confirmed
+working in-game, merged to `main`.** Tried for exactly the reason it was
+initially passed over: real risk of touching shared vanilla entity state
+we can't fully audit, explicitly scoped to a disposable branch first
+(`experiment/platter-zone-nudge`) so it could be thrown away if anything
+looked wrong. Tags the zone's UI group (e.g. "ZonesResidential") with
+`Updated` right after a build, in the *same* tick (not delayed) -
+confirmed via a temporary diagnostic query replicating Platter's own
+shape that a one-tick delay (the first attempt) was the actual bug: a
+zone's own `Created` tag is gone by the very next tick (stripped by
+`CleanUpSystem`, `SystemUpdatePhase.Cleanup`, phase 31, the last phase of
+every frame), so delaying the group's tag by a tick made it impossible
+for `m_ZonesModifiedQuery` and `m_UIAssetCategoryPrefabCreatedQuery` to
+ever be non-empty *simultaneously* - the exact condition
+`RequireAnyForUpdate`-twice actually gates on. Tagging the group in the
+same tick as the build (safe for this specific purpose - this nudge
+never reads the zone's own settled state, and Platter's resulting
+re-cache reads live data when it runs) closed that gap. Confirmed
+in-game across several zone creates/rebuilds: Platter's zone picker now
+shows our custom zones, no crash, no observed side effects on anything
+else. Still not provably safe forever - the entity tagged is shared
+vanilla infrastructure, and nothing rules out some other vanilla or
+third-party system also watching the same generic `Updated` tag
+reacting to it in a way this session's testing didn't happen to
+exercise.
+
+Deliberately isolated into its own file, `CustomZones/PlatterCompatibility.cs`
+- a single static method, called from exactly one place
+(`CustomZoneBuildRequestSystem.OnUpdate`), with no fields or other state
+anywhere else in the codebase depending on it. If this needs to come out
+- Platter ships its own fix, a game/Platter update changes the mechanics
+it relies on, or a side effect turns up later - removal is: delete that
+file, delete the one call site. The underlying gap was also reported
+upstream to Platter's author - see its own GitHub issue for the current
+status; if Platter ever fixes this on its own side, this workaround
+becomes redundant and should be the first thing removed.
 
 **Separately confirmed while investigating this**: `GameBuildingCatalog.TryMapToCoreZoneType`
 crashed the whole `CustomZoneBuildRequestSystem.OnUpdate` with an
@@ -1418,6 +1442,10 @@ adapter exists.
 
 ## Open questions (verify against game code)
 
+- [x] Merge `experiment/platter-zone-nudge` to `main`? **Done (2026-10-11)** -
+      merged after confirming in-game, isolated into its own file
+      (`PlatterCompatibility.cs`) for easy removal, and reported upstream
+      to Platter's author. See "Platter never picks up our custom zones."
 - [x] Does demand computation include cloned zone prefabs, or only vanilla
       zones? **Resolved**: generic, keyed on `AreaType`/`ZoneDensity` only -
       see "Demand is shared with vanilla, not per-custom-zone" above.
