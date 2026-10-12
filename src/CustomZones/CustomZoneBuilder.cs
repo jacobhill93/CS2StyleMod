@@ -59,6 +59,43 @@ namespace ZoneBuilder.CustomZones
             m_ZoneResolver = new GameZonePrefabResolver(world);
         }
 
+        // Pure lookup, no mutation - lets a caller check *before*
+        // committing whether a prospective set of collections would give
+        // a zone any Level 1 candidate for its base type. Exists because
+        // ZoneSpawnSystem only ever considers Level 1 for a fresh spawn
+        // on an empty lot (confirmed via decompiled source) - a zone
+        // whose collections are, say, entirely Level 3-5 can never grow
+        // anything from scratch, no error, just silent "nothing spawns."
+        // See DECISIONS.md "A collection with no Level 1 building can
+        // never spawn anything" for the original, harder-to-diagnose
+        // version of this. ZoneUISystem uses this to warn before
+        // attaching a collection that would leave a zone in that state,
+        // rather than after the fact.
+        public bool HasLevel1Candidate(Core.ZoneType baseZoneType, IEnumerable<Collection> collections)
+        {
+            foreach (var entry in EnumerateEntries(collections))
+            {
+                switch (entry)
+                {
+                    case VanillaSelectorEntry selector:
+                        foreach (var candidate in m_Catalog.Resolve(selector))
+                        {
+                            if (candidate.ZoneType == baseZoneType && candidate.Level == 1)
+                                return true;
+                        }
+                        break;
+
+                    case ExplicitAssetEntry explicitEntry:
+                        if (m_Catalog.TryResolve(explicitEntry, out var explicitCandidate) &&
+                            explicitCandidate.ZoneType == baseZoneType && explicitCandidate.Level == 1)
+                            return true;
+                        break;
+                }
+            }
+
+            return false;
+        }
+
         // Builds definition fresh the first time, or rebuilds it in place
         // on every later call - found by its stable internal name (derived
         // from definition.Id, not its user-facing Name), not by tracking

@@ -31,3 +31,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.level1WarningBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  background: hsla(40, 90%, 55%, 0.12);
+  border: 1px solid hsla(40, 90%, 55%, 0.35);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.level1WarningText {
+  color: hsla(40, 90%, 75%, 0.95);
+  white-space: normal;
+  word-break: break-word;
+}

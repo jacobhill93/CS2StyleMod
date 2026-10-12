@@ -77,6 +77,15 @@ namespace ZoneBuilder.CustomZones
             m_PendingRequests.Enqueue(new PendingRequest(definition, collections));
         }
 
+        // Unlike Request above, this is NOT queued - it's a pure,
+        // immediate read (see CustomZoneBuilder.HasLevel1Candidate's own
+        // comment), safe to call directly from a UI trigger without
+        // waiting for a frame.
+        public bool HasLevel1Candidate(Core.ZoneType baseZoneType, IEnumerable<Collection> collections)
+        {
+            return m_Builder.HasLevel1Candidate(baseZoneType, collections);
+        }
+
         // Same "safe to call from anywhere, actually runs later at the
         // right moment" contract as Request above - deactivates (doesn't
         // remove) a deleted definition's already-built zone prefab, see

@@ -2,6 +2,58 @@
 
 ## Decisions
 
+### Warn before attaching a collection with no Level 1 building (2026-10-12)
+Follow-up to "A collection with no Level 1 building can never spawn
+anything" - that was found and diagnosed after the fact (a confusing
+hour of "nothing spawns despite demand"), not caught up front. Rather
+than build the "Historical" auto-apply feature a Reddit user requested
+(explicitly rejected as a perpetual reactive system with real downsides
+- see the Historical research above), the actual want behind
+"historical/luxury neighborhood" requests turned out to connect
+directly to this older, better-understood gap: a zone with no Level 1
+candidate for its base type can never spawn anything from scratch
+(`ZoneSpawnSystem` only ever considers Level 1 for a fresh spawn), which
+is exactly what a naive "Level 5 luxury-only" collection would hit.
+
+Added `CustomZoneBuilder.HasLevel1Candidate` (pure lookup, no mutation)
+and wired it into `ZoneUISystem.OnAddCollectionToZone`: before
+attaching, checks the *full* prospective set (every collection the zone
+already has, plus the new one) for a Level 1 match - not just the new
+collection in isolation, since the zone might already have a Level 1
+candidate from an existing collection. If none exists, defers instead of
+attaching immediately: stores the pending zone/collection pair, surfaces
+a `Level1Warning` binding, and only commits
+(`CommitAddCollectionToZone`) if the user clicks through via a new
+`ConfirmAddCollectionDespiteWarning` trigger; `CancelPendingCollectionWarning`
+discards it instead. Logged via `Mod.log.Warn` either way, consistent
+with every other content-mismatch warning already in this codebase.
+
+Deliberately a one-shot check triggered by a user action, not a
+perpetual per-frame system - the user's own stated objection to the
+Historical idea ("reactive feels flimsy and easy to break") doesn't
+apply here. UI rendered as an inline banner (same pattern as the
+existing "confirm delete" row and the build-progress banner), not a new
+modal/overlay primitive - this codebase has a real prior incident
+(`cs2/ui` has no native `<select>`, and a plain-HTML fallback once took
+down the entire game HUD, not just this mod's panel) that argues for
+staying inside already-proven UI patterns.
+
+One known rough edge, not fixed: "Create Collection and Add to Zone"
+(create a brand-new, empty collection and immediately attach it) goes
+through the same check - a zone with nothing attached yet will trigger
+this warning for an *empty* collection, which is technically correct
+(nothing in an empty collection has Level 1 anything) but potentially
+redundant-feeling in that specific flow. Left as-is rather than special-
+cased, since it's accurate information either way and trivially
+dismissed with one click; worth revisiting only if it turns out to
+actually annoy people in practice.
+
+Confirmed: full build (C# + UI) succeeds, all 33 Core tests pass.
+**Not yet tested in-game** - the real test is attaching a Level-5-only
+collection to a zone and confirming the warning banner appears, "Cancel"
+truly does nothing, and "Attach Anyway" completes the attach exactly as
+before this feature existed.
+
 ### Platter nudge needed on delete too, not just create (2026-10-12)
 Found in-game: a deleted zone kept showing up in Platter's own zone
 list indefinitely. Root cause was predictable once spotted -
