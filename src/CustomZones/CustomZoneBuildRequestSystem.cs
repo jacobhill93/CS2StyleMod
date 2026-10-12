@@ -71,11 +71,30 @@ namespace CS2StyleMod.CustomZones
         private CustomZoneBuilder m_Builder;
         private PrefabSystem m_PrefabSystem;
 
+        // Diagnostic only (not Platter-facing) - a read-only replica of
+        // Platter.Systems.P_ZoneCacheSystem's own m_UIAssetCategoryPrefabCreatedQuery
+        // shape (All<UIAssetCategoryData>, Any<Created, Updated, Deleted>).
+        // Checking THIS directly, same frame as our own nudge, tells us
+        // whether the ECS-level mechanics behave the way the decompiled
+        // source suggests, independent of whatever Platter's own OnUpdate/
+        // RequireAnyForUpdate gating actually does with a match.
+        private EntityQuery m_PlatterStyleQuery;
+
         protected override void OnCreate()
         {
             base.OnCreate();
             m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             m_Builder = new CustomZoneBuilder(World, new GameBuildingCatalog(World));
+            m_PlatterStyleQuery = EntityManager.CreateEntityQuery(new EntityQueryDesc
+            {
+                All = new ComponentType[] { ComponentType.ReadOnly<UIAssetCategoryData>() },
+                Any = new ComponentType[]
+                {
+                    ComponentType.ReadOnly<Created>(),
+                    ComponentType.ReadOnly<Updated>(),
+                    ComponentType.ReadOnly<Deleted>(),
+                },
+            });
         }
 
         // Safe to call from anywhere, at any time, including OnGameLoaded -
@@ -113,7 +132,8 @@ namespace CS2StyleMod.CustomZones
                 if (EntityManager.Exists(groupEntity) && !EntityManager.HasComponent<Updated>(groupEntity))
                 {
                     EntityManager.AddComponent<Updated>(groupEntity);
-                    Mod.log.Info($"[CustomZoneBuildRequestSystem] Experimental Platter nudge: tagged group Entity {groupEntity.Index}:{groupEntity.Version} with Updated.");
+                    var matchCountNow = m_PlatterStyleQuery.CalculateEntityCount();
+                    Mod.log.Info($"[CustomZoneBuildRequestSystem] Experimental Platter nudge: tagged group Entity {groupEntity.Index}:{groupEntity.Version} with Updated. Diagnostic query (All<UIAssetCategoryData>, Any<Created,Updated,Deleted>) match count immediately after: {matchCountNow}.");
                 }
             }
 
