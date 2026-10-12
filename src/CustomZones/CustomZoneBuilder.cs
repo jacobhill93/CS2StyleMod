@@ -70,6 +70,14 @@ namespace ZoneBuilder.CustomZones
         // doesn't touch what's already built".
         public ZonePrefab BuildOrRebuild(CustomZoneDefinition definition, IEnumerable<Collection> collections)
         {
+            // See GameBuildingCatalog.InvalidateNameIndex's own comment -
+            // forces a fresh by-name lookup cache for this rebuild,
+            // reflecting anything cloned by an earlier, separate
+            // BuildOrRebuild call, while every lookup *within* this call
+            // reuses that one cache instead of re-scanning every
+            // registered building in the game per entry.
+            m_Catalog.InvalidateNameIndex();
+
             var internalZoneName = GetInternalZoneName(definition.Id);
 
             if (!TryGetOrCloneZone(definition, internalZoneName, out var clonedZone, out var clonedZoneEntity))

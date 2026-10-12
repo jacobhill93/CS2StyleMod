@@ -29,6 +29,11 @@ namespace ZoneBuilder.CustomZones.GameAdapters
         private readonly EntityManager m_EntityManager;
         private readonly EntityQuery m_BuildingQuery;
 
+        // Lazily-built, explicitly-invalidated name index backing
+        // TryGetBuildingPrefab - see that method's own comment for why
+        // this exists. null means "needs rebuilding."
+        private Dictionary<string, (BuildingPrefab Prefab, Entity Entity)> m_NameIndex;
+
         public GameBuildingCatalog(World world)
         {
             m_EntityManager = world.EntityManager;
@@ -37,6 +42,28 @@ namespace ZoneBuilder.CustomZones.GameAdapters
                 ComponentType.ReadOnly<SpawnableBuildingData>(),
                 ComponentType.ReadOnly<BuildingData>(),
                 ComponentType.ReadOnly<PrefabData>());
+        }
+
+        // Found in-game (2026-10-11): attaching a 349-entry collection
+        // froze the game hard enough to need force-killing. Root cause -
+        // TryGetBuildingPrefab did a full linear scan of every registered
+        // building in the game (vanilla + every mod's content, easily
+        // tens of thousands on a heavily-modded playset) per name lookup,
+        // and CustomZoneBuilder.EnsureBuildingCloned calls it twice per
+        // collection entry - O(entries * total buildings), invisible with
+        // the handful-of-entries collections used everywhere else this
+        // session, catastrophic at 349. CustomZoneBuilder.BuildOrRebuild
+        // calls this once per rebuild, before processing any entries -
+        // safe because a building this same call clones is never looked
+        // up again later in that same call (resolvedPrefabIds already
+        // dedupes by the external template id, and a freshly-cloned
+        // building's own internal name is never queried again until some
+        // *later*, separate rebuild). A later rebuild needing to see this
+        // call's clones is exactly why this call happens again at the
+        // start of every BuildOrRebuild, not once ever.
+        public void InvalidateNameIndex()
+        {
+            m_NameIndex = null;
         }
 
         public IEnumerable<BuildingCandidate> Resolve(VanillaSelectorEntry selector)
@@ -102,17 +129,31 @@ namespace ZoneBuilder.CustomZones.GameAdapters
         // clone calls this directly on the concrete adapter instead.
         public bool TryGetBuildingPrefab(string prefabId, out BuildingPrefab prefab, out Entity entity)
         {
+            if (m_NameIndex == null)
+                m_NameIndex = BuildNameIndex();
+
+            if (m_NameIndex.TryGetValue(prefabId, out var found))
+            {
+                prefab = found.Prefab;
+                entity = found.Entity;
+                return true;
+            }
+
+            prefab = null;
+            entity = Entity.Null;
+            return false;
+        }
+
+        private Dictionary<string, (BuildingPrefab Prefab, Entity Entity)> BuildNameIndex()
+        {
+            var index = new Dictionary<string, (BuildingPrefab Prefab, Entity Entity)>();
             var buildingEntities = m_BuildingQuery.ToEntityArray(Allocator.Temp);
             try
             {
                 foreach (var buildingEntity in buildingEntities)
                 {
-                    if (!m_PrefabSystem.TryGetPrefab<BuildingPrefab>(buildingEntity, out var candidatePrefab) || candidatePrefab.name != prefabId)
-                        continue;
-
-                    prefab = candidatePrefab;
-                    entity = buildingEntity;
-                    return true;
+                    if (m_PrefabSystem.TryGetPrefab<BuildingPrefab>(buildingEntity, out var candidatePrefab))
+                        index[candidatePrefab.name] = (candidatePrefab, buildingEntity);
                 }
             }
             finally
@@ -120,9 +161,7 @@ namespace ZoneBuilder.CustomZones.GameAdapters
                 buildingEntities.Dispose();
             }
 
-            prefab = null;
-            entity = Entity.Null;
-            return false;
+            return index;
         }
 
         // No game lookup needed - an adopted asset's candidate is built

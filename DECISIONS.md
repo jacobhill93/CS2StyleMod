@@ -2,6 +2,46 @@
 
 ## Decisions
 
+### A 349-entry collection froze the game hard enough to need force-killing (2026-10-11)
+User report: attaching a collection named "Suburbs - Fisher Pass" to a
+newly created zone, on a playset with "a ton of mods and assets," froze
+the game - not a crash, confirmed via `Player.log`: no exception, no
+out-of-memory, just `TerminateGame is already in progress, please
+wait.` repeated 12 times (the signature of a hung app being force-closed
+after someone gave up waiting). Our own log showed the operation had
+actually *finished* successfully ("349 newly cloned, 349 total
+offered") ~90 seconds before `OnDispose` - the freeze happened during or
+immediately after that work, not from a thrown exception.
+
+Root cause, found by reading `GameBuildingCatalog.TryGetBuildingPrefab`:
+it did a full linear scan of *every* registered building prefab in the
+game (vanilla + every mod's content - easily tens of thousands on a
+heavily-modded playset) per name lookup, with no cache at all. `CustomZoneBuilder.EnsureBuildingCloned`
+calls it **twice** per collection entry (once to check "already cloned
+in an earlier rebuild?", once to find the template to clone from) - so
+attaching an N-entry collection costs roughly `2N * (total buildings in
+the game)` comparisons, all synchronous, all in one frame. Invisible all
+session with the handful-of-entries collections used in every other
+test (4-16 entries) - catastrophic at 349 entries against a large
+modded building population.
+
+Fixed with a lazily-built, explicitly-invalidated name index
+(`GameBuildingCatalog.m_NameIndex`) backing `TryGetBuildingPrefab`:
+`CustomZoneBuilder.BuildOrRebuild` calls the new `InvalidateNameIndex()`
+once at the top of every call (so a later rebuild still sees whatever an
+earlier, separate rebuild cloned), and every lookup *within* that one
+call reuses the same cached dictionary instead of re-scanning. Turns the
+cost from O(entries × total buildings) into O(total buildings + entries)
+- one full scan per rebuild instead of one per entry. Safe because a
+building cloned partway through a rebuild is never looked up again
+until some later, separate rebuild (`resolvedPrefabIds` already dedupes
+within one call by the external template id). Confirmed: full rebuild
+still succeeds, all 33 Core tests still pass. **Not yet re-tested
+in-game against the actual 349-entry collection that triggered this** -
+the fix is algorithmically sound and the existing automated coverage
+still passes, but the real test is attaching that same collection again
+and confirming it no longer hangs.
+
 ### Renamed the mod from CS2StyleMod to Zone Builder (2026-10-11)
 User settled on a name. Code-level scope only this pass (per explicit
 instruction) - the C# namespace, mod id, deployed folder name, UI
