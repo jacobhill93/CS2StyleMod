@@ -72,20 +72,27 @@ softer "clear BuildingSpawnGroupData" approach, since that one exists for
 a zone that's still alive and might re-resolve the building later, which
 isn't possible once the zone itself is gone.
 
-**Residual risk, not independently verified**: zone removal was already
-confirmed safe for cells already painted with that zone type
-(`Cell.m_Zone.m_Index` is a separate, zone-specific index, unrelated to
-`PrefabSystem`'s own reindexing - see above). Whether removing a
-*building* prefab is equally safe for instances of that building already
-standing/grown in the city hasn't been specifically checked the same
-way - CS2 generally has to tolerate a placed building's prefab going
-missing (e.g. unsubscribing a Workshop pack between sessions), so this
-is *expected* to be handled gracefully, but that's inference from the
-zone case and general modding precedent, not confirmed by reading the
-same kind of real decompiled-source evidence the zone case got. Worth
-testing retiring a zone that actually has grown buildings on painted
-lots, not just an empty or newly-created one, before trusting this
-fully.
+**Update (2026-10-12): the residual risk was real - confirmed in-game,
+reverted.** Loading a save from a session where a zone (with grown
+buildings) had been retired produced dozens of `[SceneFlow] [WARN]
+Unknown prefab ID: BuildingPrefab:ZoneBuilder.Zone.<guid>.<name>` lines
+plus `Unknown prefab ID: ZonePrefab:ZoneBuilder.Zone.<guid>` in
+`Player.log`, every affected building rendering as a white box, and the
+game taking long enough to load/resolve all of them that it read as a
+full freeze. Root cause confirmed exactly as suspected: a building
+instance already placed/grown in an earlier session has its prefab
+reference baked into the save file by name - removing that prefab
+(this fix) left nothing for the save to resolve it against. The zone
+case's safety guarantee (a separate, zone-specific cell index,
+independent of `PrefabSystem`'s own bookkeeping) has no equivalent for
+buildings - an already-placed building genuinely depends on its prefab
+staying registered, full stop. Reverted: `RetireZone` no longer touches
+a zone's buildings at all, back to the original, already-safe behavior.
+Orphaned-prefab accumulation (the thing this fix was trying to solve)
+is a real but minor cost next to corrupting a save - not worth
+revisiting without a way to first confirm no live instances exist
+(not currently feasible without deeper investigation into how to query
+that).
 
 ### Chunked, incremental zone building, with a "building zone..." UI indicator (2026-10-11)
 Follow-up to the freeze above: once the remaining ~90s was understood to
