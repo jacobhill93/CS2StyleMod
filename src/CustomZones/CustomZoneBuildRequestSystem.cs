@@ -43,59 +43,37 @@ namespace CS2StyleMod.CustomZones
         private readonly Queue<PendingRequest> m_PendingRequests = new Queue<PendingRequest>();
         private readonly Queue<Guid> m_PendingRetirements = new Queue<Guid>();
 
-        // EXPERIMENTAL (branch experiment/platter-zone-nudge, 2026-10-11) -
-        // see DECISIONS.md "Platter never picks up our custom zones" for
-        // the full investigation. Platter's own reactive zone cache
-        // (Platter.Systems.P_ZoneCacheSystem) only does a full, correct
-        // re-cache (reading everything fresh - m_ZonesAllQuery, not a
-        // frozen snapshot) when a UIAssetCategoryData-tagged entity ALSO
-        // has Created/Updated/Deleted AT THE SAME TIME its own
-        // zone-change query (m_ZonesModifiedQuery) is non-empty - both
-        // conditions, same tick (confirmed by testing: calling
-        // RequireAnyForUpdate twice ANDs the two groups together, not
-        // OR). A first attempt deliberately delayed this nudge by one
-        // tick, reasoning (wrongly, for THIS specific purpose) from the
-        // real one-frame prefab-visibility issue found earlier this
-        // session - but a zone's OWN Created tag is gone (stripped by
-        // CleanUpSystem, SystemUpdatePhase.Cleanup) by the very next
-        // tick, so delaying the group's tag by a tick guaranteed the two
-        // conditions could never overlap. Confirmed via a diagnostic
-        // query replicating Platter's own shape (All<UIAssetCategoryData>,
-        // Any<Created,Updated,Deleted>) that the ECS side works exactly
-        // as expected - the delay itself was the bug. Tagging the group
-        // (e.g. "ZonesResidential" - a widely-shared vanilla entity, not
-        // one we own) in the SAME tick as the build is safe for this
-        // specific purpose: unlike the original one-frame-visibility
-        // concern, this nudge never reads the zone's own settled state at
-        // all, and Platter's resulting full re-cache reads zone data live
-        // when it runs, not from a snapshot taken now.
+        // EXPERIMENTAL (branch experiment/platter-zone-nudge, 2026-10-11,
+        // CONFIRMED WORKING IN-GAME) - see DECISIONS.md "Platter never
+        // picks up our custom zones" for the full investigation. Platter's
+        // own reactive zone cache (Platter.Systems.P_ZoneCacheSystem) only
+        // does a full, correct re-cache (reading everything fresh -
+        // m_ZonesAllQuery, not a frozen snapshot) when a
+        // UIAssetCategoryData-tagged entity has Created/Updated/Deleted AT
+        // THE SAME TIME its own zone-change query (m_ZonesModifiedQuery)
+        // is non-empty - both conditions, same tick (confirmed by testing:
+        // calling RequireAnyForUpdate twice ANDs the two groups together,
+        // not OR). Tagging the zone's own UI group (e.g.
+        // "ZonesResidential" - a widely-shared vanilla entity, not one we
+        // own) with Updated, in the SAME tick as the build (so it overlaps
+        // with the zone's own still-present Created tag), reliably
+        // triggers Platter's full re-cache. Safe for this specific
+        // purpose even though it skips the usual one-frame settling delay:
+        // this nudge never reads the zone's own state, and Platter's
+        // resulting re-cache reads zone data live when it runs, not from
+        // a snapshot taken now. Still carries the audited risk noted in
+        // DECISIONS.md - touches a shared vanilla entity's tag state every
+        // build, with no way to fully rule out some other system also
+        // watching the same generic tag reacting unexpectedly - confirmed
+        // clean across this session's testing, not provably safe forever.
         private CustomZoneBuilder m_Builder;
         private PrefabSystem m_PrefabSystem;
-
-        // Diagnostic only (not Platter-facing) - a read-only replica of
-        // Platter.Systems.P_ZoneCacheSystem's own m_UIAssetCategoryPrefabCreatedQuery
-        // shape (All<UIAssetCategoryData>, Any<Created, Updated, Deleted>).
-        // Checking THIS directly, same frame as our own nudge, tells us
-        // whether the ECS-level mechanics behave the way the decompiled
-        // source suggests, independent of whatever Platter's own OnUpdate/
-        // RequireAnyForUpdate gating actually does with a match.
-        private EntityQuery m_PlatterStyleQuery;
 
         protected override void OnCreate()
         {
             base.OnCreate();
             m_PrefabSystem = World.GetOrCreateSystemManaged<PrefabSystem>();
             m_Builder = new CustomZoneBuilder(World, new GameBuildingCatalog(World));
-            m_PlatterStyleQuery = EntityManager.CreateEntityQuery(new EntityQueryDesc
-            {
-                All = new ComponentType[] { ComponentType.ReadOnly<UIAssetCategoryData>() },
-                Any = new ComponentType[]
-                {
-                    ComponentType.ReadOnly<Created>(),
-                    ComponentType.ReadOnly<Updated>(),
-                    ComponentType.ReadOnly<Deleted>(),
-                },
-            });
         }
 
         // Safe to call from anywhere, at any time, including OnGameLoaded -
@@ -138,9 +116,7 @@ namespace CS2StyleMod.CustomZones
 
         // EXPERIMENTAL, see the field comment above - resolves the zone's
         // UI group (the same UIObject.m_Group lookup RetireZone already
-        // does) and tags it Updated immediately, same tick as the build,
-        // so it overlaps with the zone's own Created tag while that's
-        // still present.
+        // does) and tags it Updated immediately, same tick as the build.
         private void NudgeGroup(ZonePrefab zone)
         {
             if (zone == null || !zone.TryGet<UIObject>(out var uiObject) || uiObject.m_Group == null)
@@ -153,8 +129,7 @@ namespace CS2StyleMod.CustomZones
                 return;
 
             EntityManager.AddComponent<Updated>(groupEntity);
-            var matchCountNow = m_PlatterStyleQuery.CalculateEntityCount();
-            Mod.log.Info($"[CustomZoneBuildRequestSystem] Experimental Platter nudge: tagged group Entity {groupEntity.Index}:{groupEntity.Version} with Updated (same tick as build). Diagnostic query match count immediately after: {matchCountNow}.");
+            Mod.log.Info($"[CustomZoneBuildRequestSystem] Experimental Platter nudge: tagged group Entity {groupEntity.Index}:{groupEntity.Version} with Updated (same tick as build).");
         }
     }
 }
