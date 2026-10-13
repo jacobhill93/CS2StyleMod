@@ -1,35 +1,37 @@
 using System;
 using System.IO;
+using System.Linq;
 using ZoneBuilder.Core;
 using Xunit;
 
 namespace ZoneBuilder.Core.Tests
 {
-    public class JsonFileCustomZoneDefinitionLibraryTests : IDisposable
+    public class FolderCustomZoneDefinitionLibraryTests : IDisposable
     {
-        private readonly string m_FilePath;
+        private readonly string m_FolderPath;
 
-        public JsonFileCustomZoneDefinitionLibraryTests()
+        public FolderCustomZoneDefinitionLibraryTests()
         {
-            m_FilePath = Path.Combine(Path.GetTempPath(), $"cs2stylemod-tests-{Guid.NewGuid()}.json");
+            m_FolderPath = Path.Combine(Path.GetTempPath(), $"cs2stylemod-tests-{Guid.NewGuid()}");
         }
 
         public void Dispose()
         {
-            if (File.Exists(m_FilePath))
-                File.Delete(m_FilePath);
+            if (Directory.Exists(m_FolderPath))
+                Directory.Delete(m_FolderPath, recursive: true);
         }
 
         [Fact]
-        public void MissingFileStartsAsAnEmptyLibrary()
+        public void MissingFolderStartsAsAnEmptyLibrary()
         {
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
 
             Assert.Empty(library.GetAll());
+            Assert.Empty(library.LoadFailures);
         }
 
         [Fact]
-        public void SavedDefinitionIsFoundByIdAfterReopeningTheFile()
+        public void SavedDefinitionIsFoundByIdAfterReopeningTheFolder()
         {
             var collectionIdA = Guid.NewGuid();
             var collectionIdB = Guid.NewGuid();
@@ -37,14 +39,25 @@ namespace ZoneBuilder.Core.Tests
             definition.AddCollection(collectionIdA);
             definition.AddCollection(collectionIdB);
 
-            new JsonFileCustomZoneDefinitionLibrary(m_FilePath).Save(definition);
+            new FolderCustomZoneDefinitionLibrary(m_FolderPath).Save(definition);
 
             // A fresh instance simulates reopening the game.
-            var reopened = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var reopened = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
             Assert.True(reopened.TryGet(definition.Id, out var loaded));
             Assert.Equal("Mid Century Modern", loaded.Name);
             Assert.Equal(ZoneType.ResidentialLow, loaded.BaseZoneType);
             Assert.Equal(new[] { collectionIdA, collectionIdB }, loaded.CollectionIds);
+        }
+
+        [Fact]
+        public void EachDefinitionGetsItsOwnFileNamedByItsId()
+        {
+            var definition = new CustomZoneDefinition("Solo", ZoneType.ResidentialLow);
+            new FolderCustomZoneDefinitionLibrary(m_FolderPath).Save(definition);
+
+            var expectedPath = Path.Combine(m_FolderPath, $"{definition.Id}.json");
+            Assert.True(File.Exists(expectedPath));
+            Assert.Single(Directory.GetFiles(m_FolderPath, "*.json"));
         }
 
         [Fact]
@@ -60,28 +73,29 @@ namespace ZoneBuilder.Core.Tests
         {
             var definition = new CustomZoneDefinition("North American Suburb", ZoneType.ResidentialLow, ZoneRegion.NorthAmerica);
 
-            new JsonFileCustomZoneDefinitionLibrary(m_FilePath).Save(definition);
+            new FolderCustomZoneDefinitionLibrary(m_FolderPath).Save(definition);
 
-            var reopened = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var reopened = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
             Assert.True(reopened.TryGet(definition.Id, out var loaded));
             Assert.Equal(ZoneRegion.NorthAmerica, loaded.Region);
         }
 
         [Fact]
-        public void LoadingALibraryFileSavedBeforeRegionExistedDefaultsToEurope()
+        public void LoadingADefinitionFileSavedBeforeRegionExistedDefaultsToEurope()
         {
             // Hand-written, deliberately missing the "Region" field - what
-            // every library file saved before this feature existed
+            // every definition file saved before this feature existed
             // actually looks like. Must default to Europe, not
             // ZoneRegion's own zero-value (NorthAmerica) - see
             // CustomZoneDefinitionDto.Region's own comment for why.
             var id = Guid.NewGuid();
+            Directory.CreateDirectory(m_FolderPath);
             var json = "{ \"SchemaVersion\": 1, \"Definitions\": [ "
                 + $"{{ \"Id\": \"{id}\", \"Name\": \"Old Save\", \"BaseZoneType\": \"ResidentialLow\", \"CollectionIds\": [] }}"
                 + " ] }";
-            File.WriteAllText(m_FilePath, json);
+            File.WriteAllText(Path.Combine(m_FolderPath, $"{id}.json"), json);
 
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
 
             Assert.True(library.TryGet(id, out var loaded));
             Assert.Equal(ZoneRegion.Europe, loaded.Region);
@@ -90,7 +104,7 @@ namespace ZoneBuilder.Core.Tests
         [Fact]
         public void RenamingDoesNotChangeTheId()
         {
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
             var definition = new CustomZoneDefinition("Original Name", ZoneType.CommercialLow);
             library.Save(definition);
             var id = definition.Id;
@@ -126,21 +140,23 @@ namespace ZoneBuilder.Core.Tests
         }
 
         [Fact]
-        public void DeleteRemovesTheDefinitionAndPersists()
+        public void DeleteRemovesTheDefinitionAndItsFile()
         {
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
             var definition = new CustomZoneDefinition("Temporary", ZoneType.Industrial);
             library.Save(definition);
+            var filePath = Path.Combine(m_FolderPath, $"{definition.Id}.json");
 
             library.Delete(definition.Id);
 
-            Assert.False(new JsonFileCustomZoneDefinitionLibrary(m_FilePath).TryGet(definition.Id, out _));
+            Assert.False(File.Exists(filePath));
+            Assert.False(new FolderCustomZoneDefinitionLibrary(m_FolderPath).TryGet(definition.Id, out _));
         }
 
         [Fact]
         public void DeletingAnUnknownIdIsANoOp()
         {
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
 
             library.Delete(Guid.NewGuid());
 
@@ -150,7 +166,7 @@ namespace ZoneBuilder.Core.Tests
         [Fact]
         public void TryGetOnMissingIdReturnsFalseWithoutThrowing()
         {
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
 
             var found = library.TryGet(Guid.NewGuid(), out var definition);
 
@@ -161,32 +177,39 @@ namespace ZoneBuilder.Core.Tests
         [Fact]
         public void FailedSaveOfANewDefinitionRollsBackInMemoryState()
         {
-            // Pointed at a directory, not a file - see
-            // JsonFileCollectionLibraryTests's identical test for why this
-            // reliably fails WriteToDisk's File.Delete(m_FilePath) step.
-            var library = new JsonFileCustomZoneDefinitionLibrary(Path.GetTempPath());
-            var definition = new CustomZoneDefinition("Will Not Persist", ZoneType.ResidentialLow);
+            // Pointed at a file, not a folder - see
+            // FolderCollectionLibraryTests's identical test for why this
+            // reliably fails Directory.CreateDirectory inside WriteToDisk.
+            var blockingFilePath = Path.Combine(Path.GetTempPath(), $"cs2stylemod-tests-blocker-{Guid.NewGuid()}");
+            File.WriteAllText(blockingFilePath, "not a folder");
+            try
+            {
+                var library = new FolderCustomZoneDefinitionLibrary(blockingFilePath);
+                var definition = new CustomZoneDefinition("Will Not Persist", ZoneType.ResidentialLow);
 
-            Assert.ThrowsAny<Exception>(() => library.Save(definition));
-            Assert.Empty(library.GetAll());
+                Assert.ThrowsAny<Exception>(() => library.Save(definition));
+                Assert.Empty(library.GetAll());
+            }
+            finally
+            {
+                File.Delete(blockingFilePath);
+            }
         }
 
         [Fact]
         public void FailedSaveOfAnExistingDefinitionRollsBackToThePreviousValue()
         {
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
             var original = new CustomZoneDefinition("Original", ZoneType.ResidentialLow);
             library.Save(original);
             var id = original.Id;
+            var filePath = Path.Combine(m_FolderPath, $"{id}.json");
 
-            File.SetAttributes(m_FilePath, FileAttributes.ReadOnly);
+            File.SetAttributes(filePath, FileAttributes.ReadOnly);
             try
             {
                 // TryGet -> mutate -> Save, the same pattern
-                // ZoneUISystem.OnRenameZone actually uses - mutating
-                // `original` directly wouldn't exercise TryGet's
-                // defensive-copy behavior (see its own comment) at all,
-                // and the rollback this is testing depends entirely on it.
+                // ZoneUISystem.OnRenameZone actually uses.
                 Assert.True(library.TryGet(id, out var toRename));
                 toRename.Name = "Changed";
                 Assert.ThrowsAny<Exception>(() => library.Save(toRename));
@@ -196,18 +219,19 @@ namespace ZoneBuilder.Core.Tests
             }
             finally
             {
-                File.SetAttributes(m_FilePath, FileAttributes.Normal);
+                File.SetAttributes(filePath, FileAttributes.Normal);
             }
         }
 
         [Fact]
         public void FailedDeleteRollsBackInMemoryState()
         {
-            var library = new JsonFileCustomZoneDefinitionLibrary(m_FilePath);
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
             var definition = new CustomZoneDefinition("Persistent", ZoneType.Industrial);
             library.Save(definition);
+            var filePath = Path.Combine(m_FolderPath, $"{definition.Id}.json");
 
-            File.SetAttributes(m_FilePath, FileAttributes.ReadOnly);
+            File.SetAttributes(filePath, FileAttributes.ReadOnly);
             try
             {
                 Assert.ThrowsAny<Exception>(() => library.Delete(definition.Id));
@@ -215,8 +239,25 @@ namespace ZoneBuilder.Core.Tests
             }
             finally
             {
-                File.SetAttributes(m_FilePath, FileAttributes.Normal);
+                File.SetAttributes(filePath, FileAttributes.Normal);
             }
+        }
+
+        [Fact]
+        public void AMalformedFileIsIsolatedAndReportedWithoutBreakingOtherDefinitions()
+        {
+            Directory.CreateDirectory(m_FolderPath);
+            File.WriteAllText(Path.Combine(m_FolderPath, "broken.json"), "{ not valid json ");
+
+            var good = new CustomZoneDefinition("Good", ZoneType.ResidentialLow);
+            new FolderCustomZoneDefinitionLibrary(m_FolderPath).Save(good);
+
+            var library = new FolderCustomZoneDefinitionLibrary(m_FolderPath);
+
+            Assert.Equal("Good", Assert.Single(library.GetAll()).Name);
+            var failure = Assert.Single(library.LoadFailures);
+            Assert.Contains("broken.json", failure.FilePath);
+            Assert.NotNull(failure.Error);
         }
     }
 }

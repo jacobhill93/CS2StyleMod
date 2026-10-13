@@ -47,7 +47,7 @@ namespace ZoneBuilder.Core
         // Exists so ICollectionLibrary.TryGet can hand out a value the
         // caller can freely mutate without that mutation silently
         // touching the library's own stored state before Save is called -
-        // see JsonFileCollectionLibrary.TryGet's comment for why this
+        // see FolderCollectionLibrary.TryGet's comment for why this
         // matters (it's what makes Save's rollback-on-failure actually
         // correct, not just structurally present).
         public Collection Clone()

@@ -34,13 +34,63 @@ namespace ZoneBuilder
             if (GameManager.instance.modManager.TryGetExecutableAsset(this, out var asset))
                 log.Info($"Current mod asset at {asset.path}");
 
-            var libraryPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(ZoneBuilder), "collections.json");
-            CollectionLibrary = new JsonFileCollectionLibrary(libraryPath);
-            log.Info($"Collection library: {libraryPath} ({CollectionLibrary.GetAll().Count} collection(s))");
+            // One file per collection (<Id>.json) under Collections/, not
+            // one combined file - see DECISIONS.md "Migrated to one file
+            // per collection" for why. legacyLibraryPath is the old
+            // single-file format a pre-migration install still has on
+            // disk; MigrateIfNeeded splits it into the new folder once,
+            // then renames it to collections.json.migrated so this never
+            // re-runs.
+            var collectionsFolderPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(ZoneBuilder), "Collections");
+            var legacyLibraryPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(ZoneBuilder), "collections.json");
+            var migration = LegacyCollectionsMigrator.MigrateIfNeeded(legacyLibraryPath, collectionsFolderPath);
+            if (migration.Attempted)
+            {
+                if (migration.FatalError != null)
+                    log.Error(migration.FatalError, $"Could not read legacy collections file '{legacyLibraryPath}' - left untouched, nothing migrated this launch.");
+                else
+                    log.Info($"Migrated {migration.MigratedCount} collection(s) from the old single-file format to {collectionsFolderPath}.");
+                foreach (var failure in migration.CollectionFailures)
+                    log.Warn(failure.Error, $"Failed to migrate collection '{failure.Name}' ({failure.Id}) - not carried over, legacy file kept as a backup to recover it by hand.");
+            }
 
-            var customZonesPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(ZoneBuilder), "customZones.json");
-            CustomZoneDefinitionLibrary = new JsonFileCustomZoneDefinitionLibrary(customZonesPath);
-            log.Info($"Custom zone definition library: {customZonesPath} ({CustomZoneDefinitionLibrary.GetAll().Count} definition(s))");
+            CollectionLibrary = new FolderCollectionLibrary(collectionsFolderPath);
+            foreach (var failure in ((FolderCollectionLibrary)CollectionLibrary).LoadFailures)
+                log.Warn(failure.Error, $"Failed to load collection file '{failure.FilePath}' - skipped, every other collection still loaded normally.");
+
+            // Boot-time-only import - no in-game button, no live trigger.
+            // Drop exported/shared collection files (same schema as our
+            // own collection files, see CollectionFileFormat) into this
+            // folder before launching and they're picked up here, moved
+            // to Imports/Processed/ once done so they don't re-import
+            // every boot. See DECISIONS.md.
+            var importsPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(ZoneBuilder), "Imports");
+            var importResult = CollectionImporter.ImportFromFolder(importsPath, CollectionLibrary);
+            if (importResult.ImportedCollectionCount > 0)
+                log.Info($"Imported {importResult.ImportedCollectionCount} collection(s) from {importsPath}");
+            foreach (var failure in importResult.Failures)
+                log.Warn(failure.Error, $"Failed to import '{failure.FilePath}' - left in place, fix its JSON and it'll be retried next launch.");
+
+            log.Info($"Collection library: {collectionsFolderPath} ({CollectionLibrary.GetAll().Count} collection(s))");
+
+            var zoneDefinitionsFolderPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(ZoneBuilder), "Zones");
+            var legacyZonesPath = Path.Combine(EnvPath.kUserDataPath, "ModsData", nameof(ZoneBuilder), "customZones.json");
+            var zoneMigration = LegacyCustomZoneDefinitionsMigrator.MigrateIfNeeded(legacyZonesPath, zoneDefinitionsFolderPath);
+            if (zoneMigration.Attempted)
+            {
+                if (zoneMigration.FatalError != null)
+                    log.Error(zoneMigration.FatalError, $"Could not read legacy custom zones file '{legacyZonesPath}' - left untouched, nothing migrated this launch.");
+                else
+                    log.Info($"Migrated {zoneMigration.MigratedCount} custom zone definition(s) from the old single-file format to {zoneDefinitionsFolderPath}.");
+                foreach (var failure in zoneMigration.DefinitionFailures)
+                    log.Warn(failure.Error, $"Failed to migrate zone definition '{failure.Name}' ({failure.Id}) - not carried over, legacy file kept as a backup to recover it by hand.");
+            }
+
+            CustomZoneDefinitionLibrary = new FolderCustomZoneDefinitionLibrary(zoneDefinitionsFolderPath);
+            foreach (var failure in ((FolderCustomZoneDefinitionLibrary)CustomZoneDefinitionLibrary).LoadFailures)
+                log.Warn(failure.Error, $"Failed to load zone definition file '{failure.FilePath}' - skipped, every other zone definition still loaded normally.");
+
+            log.Info($"Custom zone definition library: {zoneDefinitionsFolderPath} ({CustomZoneDefinitionLibrary.GetAll().Count} definition(s))");
 
             m_Setting = new Setting(this);
             m_Setting.RegisterInOptionsUI();

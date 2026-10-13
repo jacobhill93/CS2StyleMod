@@ -14,17 +14,26 @@ spawn code lives here — see `../CustomZones/GameAdapters` and
   seam a GameAdapter implements against real prefabs (fakeable in tests).
 - `CandidateFilter.cs` — the eligibility logic itself, including the
   configurable fallback policy.
-- `ICollectionLibrary.cs`, `JsonFileCollectionLibrary.cs` — the global,
-  cross-save collection library from `../../DECISIONS.md` ("Collections
-  persist in a global library, referenced by GUID"). Pure BCL + Newtonsoft -
-  no game dependency; `Mod.cs` is the only place that decides *where* the
-  file lives (via `Colossal.PSI.Environment.EnvPath`) and wires it up.
+- `ICollectionLibrary.cs`, `FolderCollectionLibrary.cs`,
+  `CollectionFileFormat.cs` — the global, cross-save collection library
+  from `../../DECISIONS.md` ("Collections persist in a global library,
+  referenced by GUID"). One file per collection (`<Id>.json`), not one
+  combined file - see DECISIONS.md "Migrated to one file per collection"
+  for why. Pure BCL + Newtonsoft - no game dependency; `Mod.cs` is the
+  only place that decides *where* the folder lives (via
+  `Colossal.PSI.Environment.EnvPath`) and wires it up.
+  `LegacyCollectionsMigrator.cs` is the one-time upgrade path from the
+  old single-file format. `CollectionImporter.cs` is the separate,
+  boot-time-only mechanism for dropping in externally-sourced collection
+  files - see its own header comment.
 - `CustomZoneDefinition.cs`, `ICustomZoneDefinitionLibrary.cs`,
-  `JsonFileCustomZoneDefinitionLibrary.cs` — a persisted, user-defined
+  `FolderCustomZoneDefinitionLibrary.cs`, `CustomZoneDefinitionFileFormat.cs`,
+  `LegacyCustomZoneDefinitionsMigrator.cs` — a persisted, user-defined
   custom zone: a base `ZoneType` plus the `Collection` Id(s) it should pull
-  buildings from. Same rename-free, GUID-keyed persistence shape as
-  `Collection`, stored in its own file. What actually turns one into an
-  in-game zone lives in `../CustomZones/CustomZoneBuilder.cs`.
+  buildings from. Same one-file-per-definition, rename-free, GUID-keyed
+  persistence shape as `Collection` above - mirrors it exactly. What
+  actually turns one into an in-game zone lives in
+  `../CustomZones/CustomZoneBuilder.cs`.
 
 All unit-tested without the game in `../../tests/ZoneBuilder.Core.Tests`
 (run with `dotnet test tests/ZoneBuilder.Core.Tests`).
