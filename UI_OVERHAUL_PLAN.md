@@ -9,10 +9,13 @@ are deleted, not just unregistered.
 Condensed 2026-10-12 ahead of a new incoming UI guide - this is no
 longer a live plan, just a compact index: what shipped, the durable
 engine constraints worth not re-discovering, and where to find the full
-story if needed. Phase numbers/decision numbers below are still
-referenced by name in code comments throughout `UI/src/` - kept stable
-for that reason even though the surrounding prose is gone. Full
-blow-by-blow reasoning for anything here lives in `DECISIONS.md`
+story if needed. **As a working document for new UI work, this file is
+now superseded by `UI_UPGRADE_GUIDE.md`** (not yet committed as of this
+note) - `DECISIONS.md` remains the historical record either way. Phase
+numbers/decision numbers below are still referenced by name in code
+comments throughout `UI/src/` - kept stable for that reason even though
+the surrounding prose is gone. Full blow-by-blow reasoning for anything
+here lives in `DECISIONS.md`
 (dated entries) and git history, not reproduced here.
 
 ## Durable engine constraints (confirmed, not guessed - read before writing new UI)

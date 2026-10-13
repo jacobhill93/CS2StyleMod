@@ -3,9 +3,10 @@
 // Fixed top/right offset, not draggable - see UI_OVERHAUL_PLAN.md decision
 // #1. Starting values are a guess to be confirmed in-game (not copied
 // verbatim from Road Builder, which uses a "rem" unit tuned to its own
-// panel; this codebase's other panels all use plain px - see
-// ResizeHandle.module.scss) - the fpsLevel step-up amounts mirror Road
-// Builder's relative proportions as a starting point, not final numbers.
+// panel; this codebase's own base.scss spacing scale is plain px instead
+// - see UI_OVERHAUL_PLAN.md's "px vs rem" note) - the fpsLevel step-up
+// amounts mirror Road Builder's relative proportions as a starting
+// point, not final numbers.
 .shell {
     position: absolute;
     top: 60px;

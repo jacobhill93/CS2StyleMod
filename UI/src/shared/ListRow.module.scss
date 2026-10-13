@@ -6,8 +6,8 @@
 // its own slightly-different copy of. Longhand border/background
 // properties only (border-bottom-style/-width/-color, background-color)
 // - this engine's var() doesn't work in shorthand properties or support
-// a fallback argument at all, confirmed earlier this project
-// (ResizeHandle.module.scss has the full story).
+// a fallback argument at all - see UI_OVERHAUL_PLAN.md's durable engine
+// constraints list.
 .row {
     display: flex;
     align-items: center;
