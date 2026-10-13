@@ -10,6 +10,7 @@ import { BuildingThumbnail } from "shared/BuildingThumbnail";
 import styles from "./CollectionsTab.module.scss";
 import inputStyles from "shared/TextInput.module.scss";
 import { TextInputTheme } from "vanilla/TextInputTheme";
+import { RenameableTitle } from "shared/RenameableTitle";
 
 interface BuildingEntry {
     prefabId: string;
@@ -212,9 +213,10 @@ const CollectionDetail = ({ collection, buildings, onBack, onAddAssets }: Collec
         <>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                 <Button onSelect={onBack}>Back</Button>
-                <span style={{ fontSize: "14px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {collection.name}
-                </span>
+                <RenameableTitle
+                    name={collection.name}
+                    onRename={(newName) => trigger(mod.id, "RenameCollection", collection.id, newName)}
+                />
             </div>
             <CollectionLevel1WarningBanner collectionId={collection.id} />
             <Scrollable vertical style={{ height: "220px" }}>

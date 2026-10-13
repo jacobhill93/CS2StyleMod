@@ -10,6 +10,7 @@ import rowStyles from "shared/ListRow.module.scss";
 import styles from "./ZonesTab.module.scss";
 import inputStyles from "shared/TextInput.module.scss";
 import { TextInputTheme } from "vanilla/TextInputTheme";
+import { RenameableTitle } from "shared/RenameableTitle";
 
 interface CollectionEntry {
     id: string;
@@ -266,9 +267,10 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
         <>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                 <Button onSelect={onBack}>Back</Button>
-                <span style={{ fontSize: "14px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {zone.name}
-                </span>
+                <RenameableTitle
+                    name={zone.name}
+                    onRename={(newName) => trigger(mod.id, "RenameZone", zone.id, newName)}
+                />
             </div>
             <Scrollable vertical style={{ height: "220px" }}>
                 {attached.length === 0 && (
