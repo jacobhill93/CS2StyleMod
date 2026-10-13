@@ -2,7 +2,338 @@
 
 ## Decisions
 
-### Warn before attaching a collection with no Level 1 building (2026-10-12)
+### Migrated to one file per collection (and per custom zone) (2026-10-12)
+Prompted by a direct question: "why cannot zone and collections just be
+a separate file for each? would this not protect better against a
+corrupted file." Correct instinct, and digging into it surfaced
+something worse than what was being guarded against: `Load()` on both
+the collections and custom-zone-definitions libraries had **zero
+exception handling** around the JSON deserialize call. A genuinely
+corrupted combined file wouldn't just lose data - the exception would
+propagate straight out of the constructor, straight out of
+`Mod.OnLoad`, likely taking down the *entire mod* (no UI systems ever
+get registered - that all happens later in the same method). One
+corrupted file risked everything, not just itself.
+
+**Collections**: `ICollectionLibrary`'s old single-file implementation
+(`JsonFileCollectionLibrary`) replaced with `FolderCollectionLibrary` -
+one file per collection, `Collections/<Id>.json`, each with its own
+independent write-then-replace atomic save (same pattern as before, now
+scoped per-file instead of to the whole library). A bad file is now
+isolated to itself: reported via a new `LoadFailures` list the
+constructor populates, every other collection still loads normally.
+`JsonFileCollectionLibrary`'s private DTOs/conversion logic extracted
+into `CollectionFileFormat.cs` (shared with `CollectionImporter`, no
+behavior change - confirmed by every existing test passing unmodified
+before the rest of this work started). `LegacyCollectionsMigrator.cs`
+handles the one-time upgrade: reads the old combined file, writes each
+collection out as its own file (deliberately *not* just moving the old
+file into the new folder and relying on `FolderCollectionLibrary`'s own
+multi-collection-per-file tolerance - see that tolerance's own comment
+for why that specific shortcut would make affected collections silently
+undeletable), then renames the old file to `collections.json.migrated`
+(kept as a recoverable trace, not deleted - same discipline as
+`CollectionImporter`'s `Imports/Processed/`). A single bad *collection*
+inside an otherwise-good legacy file is skipped and reported, not fatal
+to the rest; only a genuinely unparseable top-level file aborts
+migration entirely, leaving the legacy file untouched for manual
+recovery.
+
+**Custom zone definitions**: identical treatment -
+`JsonFileCustomZoneDefinitionLibrary` replaced with
+`FolderCustomZoneDefinitionLibrary` (`Zones/<Id>.json`),
+`CustomZoneDefinitionFileFormat.cs`,
+`LegacyCustomZoneDefinitionsMigrator.cs`. The original class's own
+comment already said "mirrors JsonFileCollectionLibrary exactly" - the
+same bug existed here for the same reason, confirmed before doing the
+work, not assumed.
+
+**Verified against the user's actual real data before ever letting the
+real game touch it** (copies in a scratch location, not the live
+files): both migrations ran clean - 4 collections (349, 5, 10, and 10
+entries respectively, matching exactly), 1 zone definition, zero
+failures, and a referential-integrity cross-check confirmed the
+migrated zone's `CollectionIds` still resolve correctly against the
+migrated collections (migration preserves original Ids - unlike
+`CollectionImporter`'s imports, which deliberately assign fresh ones,
+migration isn't creating new content, so existing references must keep
+working). Scratch verification code deleted after confirming, never
+part of the real suite.
+
+62 Core tests now (up from 33 at the start of this session) - new
+coverage for both folder libraries' per-file isolation and both
+migrators' fatal-vs-per-item failure handling, mirroring each other's
+test shape intentionally (standardized architecture, standardized
+tests). Full build (C# + UI) succeeds, deployed.
+
+**Not yet tested in-game** - the actual migration has only run against
+copies in a dry run, never the real files yet (deliberately - the
+natural trigger is the next real launch, same "no special action
+needed" philosophy as every other boot-time piece this session).
+Worth confirming on next launch: `Logs/ZoneBuilder.Mod.log` shows
+"Migrated 4 collection(s)..." and "Migrated 1 custom zone
+definition(s)...", the real `ModsData/ZoneBuilder/Collections/` and
+`Zones/` folders contain one file each, `collections.json`/
+`customZones.json` are gone (renamed to `.migrated`), and every
+existing zone/collection in the Collections/Zones tabs still shows up
+and still works exactly as before - this is meant to be invisible to
+actually using the mod, not a visible change.
+
+### Boot-time collection import from a fixed folder (2026-10-12)
+Follow-up to the Reddit question about importing a Find It Collections
+export, and the manual test that preceded this (hand-merging a real
+10-asset subset of the user's own "Suburbs - Fisher Pass" collection
+into their live `collections.json`, confirmed working in-game). That
+test proved the schema/parsing side works; the real problem it exposed
+is that hand-editing a single shared JSON file isn't something to ask of
+anyone - one misplaced comma and the whole library fails to load.
+
+**Deliberately the simplest version of this feature, not the most
+complete one** - decided in conversation, not something to second-guess
+later without a real reason to revisit:
+- No export feature. The user can already find and copy a real
+  `collections.json` (or a hand-trimmed piece of one) themselves.
+- No in-game import button or live trigger. Files are dropped into a
+  fixed folder *before* launching, and picked up once at `Mod.OnLoad` -
+  "no async trigger," the user's own words, confirming this isn't meant
+  to be a live, in-game action.
+- Find It Collections' own export format is explicitly out of scope
+  until that mod actually ships and the format can be compared against
+  ours - this only understands our own schema today.
+
+**Implementation**: `ModsData/ZoneBuilder/Imports/`, scanned once at
+`OnLoad` right after `CollectionLibrary` is constructed
+(`CollectionImporter.ImportFromFolder`, new, `src/Core/
+CollectionImporter.cs`). Each `.json` file uses the exact same schema as
+`collections.json` itself (`CollectionFileFormat`, extracted out of
+`JsonFileCollectionLibrary`, which used to define these DTOs privately -
+no behavior change there, confirmed by the existing `
+JsonFileCollectionLibraryTests` all still passing unmodified) - so a
+dropped-in file can be either a single-collection snippet (like the
+manual test) or someone's entire exported library, both just work
+identically.
+
+Decisions made explicitly, not defaulted silently:
+- **Every imported collection gets a fresh `Guid.NewGuid()`, never the
+  file's own stored Id** (user's call) - an import always coexists
+  rather than risking a silent overwrite if a stored Id happens to
+  collide with something already in the library.
+- **A malformed file is reported as a `Failure` and left in place**, not
+  moved - the rest of the folder still gets processed, and the user can
+  fix the file and it's retried on the next launch (user's call,
+  matching the per-file try/catch discipline already used for Phase 5's
+  file-I/O exception safety).
+- **A successfully imported file gets moved to `Imports/Processed/`**
+  (my default, not something the user was asked to confirm but flagged
+  explicitly before building) - otherwise every launch would re-import
+  and duplicate the same collections again. A same-named file already in
+  `Processed/` gets a timestamp-suffixed name rather than being
+  overwritten.
+
+`Core` stays game-independent per `ARCHITECTURE.md` - `CollectionImporter`
+is pure BCL + Newtonsoft.Json, no logging dependency (failures are
+returned, not logged, from Core; `Mod.cs` logs them via `Mod.log.Warn`
+with the actual exception attached). 6 new Core tests
+(`CollectionImporterTests.cs`) cover: missing folder, a single-snippet
+import with fresh-Id confirmation, a multi-collection file, Processed/
+move-and-no-reimport-on-second-run, a malformed file left in place and
+reported, and a malformed file not blocking a good file in the same
+folder. All 39 Core tests pass; full build (C# + UI) succeeds.
+
+**Confirmed in-game (2026-10-12)**: dropped a renamed copy of the
+Desktop test file into `ModsData/ZoneBuilder/Imports/` and launched.
+`Logs/ZoneBuilder.Mod.log` (routine INFO-level output goes here, not
+`Player.log` - only warnings/exceptions get mirrored into the latter;
+worth remembering next time a log line seems to be "missing") shows the
+exact expected sequence: `Imported 1 collection(s) from ...\Imports`,
+then `Collection library: ... (4 collection(s))` - the new import plus
+the 3 already there. File correctly moved to `Imports/Processed/`.
+In-game, "Imported Test - Fisher Pass" shows up as a second, independent
+collection alongside the original manually-merged one - fresh-GUID
+coexistence confirmed working exactly as designed, no collision.
+
+### Cloned buildings show up fully in Find It, self-labeled, and can't be hidden from it (2026-10-12)
+Prompted by a Reddit question about a separate "Find It Collections" addon
+mod (importable/exportable building sets) and whether our per-zone
+building clones would look like duplicates there.
+
+**Confirmed in-game**: Find It shows a clone as a complete, independent,
+fully-browsable entry - no dedup/grouping that hides or merges it with
+the original. Display name is clean, not an exposed internal name:
+`CustomZoneBuilder.EnsureBuildingCloned` already calls
+`RegisterDisplayName(clonedBuildingEntity, $"{displayZoneName} -
+{templateBuilding.name}")` for every cloned building, not just the zone
+prefab (confirmed from the code, not just observed) - so Find It shows
+e.g. "FindItTest - PittHouse15", which self-explains which zone a clone
+belongs to. Net effect is actually good for players: no confusion about
+which entry is the original vs. the zone-specific clone.
+
+**Can a clone be hidden from Find It? No, and not because of a missing
+API - structurally not possible without breaking the clone's actual
+function.** `Game.Prefabs.UIObject.m_IsDebugObject` is a real vanilla
+flag (confirmed via `D:\CS2-Decompiled\Game.Prefabs\UIObject.cs`) that
+suppresses `UIObjectData`/UI-group registration in a release build -
+looked promising at first. But Find It's own `PrefabIndexingSystem.cs`
+(fetched from its GitHub source, not guessed) builds its building
+catalog via `WithAll<BuildingData, SpawnableBuildingData,
+PrefabData>().WithNone<SignatureBuildingData>()` - it never checks
+`m_IsDebugObject` at all. Its inclusion criteria are exactly the
+components a clone needs to function as a real growable building; the
+only exclusion it applies (`SignatureBuildingData`) would misclassify
+the clone as a landmark building if used to hide it, breaking its actual
+spawn behavior. There's no separate "visible to Find It" vs. "usable by
+our zone" axis to toggle - hiding one means breaking the other. Would
+need a change on Find It's own side, not ours. Given the display-name
+self-labeling above already avoids real confusion, not pursued further.
+
+### Phase 7.3 reverted - assetGridTheme.item is a grid tile, not a row (2026-10-12)
+Tested in-game: list rows across the Collections/Assets/Zones tabs
+rendered as small smushed squares instead of full-width rows -
+"everything looks smushed." Root cause, confirmed by grepping the
+installed game's actual CSS for `.item_a5m` (the base class inside
+`assetGridTheme.item`): `width/height: var(--assetMenuItemSize);
+display:flex; justify-content:center; align-items:center` - a
+**fixed-size, centered-content grid tile**, never meant for a full-width
+row at all. Should have been caught before implementation, not after:
+checking Road Builder's own `ManageRoadsView` (the UI_OVERHAUL_PLAN.md
+reference for this exact kind of panel) would have shown its building-
+list is a grid of square thumbnails, not rows like this mod's - there
+was never a real vanilla analogue for a row-shaped list here, Road
+Builder solves a visually different layout problem. `assetGridTheme`
+was verified to genuinely *exist* (Phase 7.1's own discipline), but
+"does this class exist" and "is this class meant for what I'm about to
+use it for" are different questions, and only the first one got asked
+before writing code.
+
+Reverted cleanly: deleted `UI/src/vanilla/VanillaComponentResolver.tsx`
+(no other consumer existed) and `UI/src/shared/rowClassName.ts`, un-did
+the 5 call sites back to plain `rowStyles.row`, removed the now-stale
+`assetGridTheme` references from `THIRD_PARTY_NOTICES.md`/
+`TOUCHPOINTS.md`. `ListRow.module.scss`'s existing hand-rolled hover
+styling (confirmed good in Phase 6) is untouched and still in place.
+Phase 7.4 (the `TextInputTheme`/raw-`<input>` retrofit) is unaffected -
+confirmed no visual issue reported for it - so that part stays.
+
+A legitimate future use for `assetGridTheme.item` still exists (an
+actual grid-of-tiles UI, if one ever gets built - e.g. Find It's docking
+pattern mentioned in `UI_STYLE_GUIDE.md` section 5, still describe-only
+and out of scope today) - just not for anything this mod currently
+renders as a list.
+
+**Confirmed in-game (2026-10-12)**: rows back to normal full-width
+after the revert, no regression. The `TextInputTheme`/raw-`<input>`
+retrofit (Phase 7.4) also confirmed fine - no visual issue reported for
+it either. User is weighing a bigger follow-up: a real grid+detail-panel
+redesign of the Assets tab specifically (where building thumbnails make
+`assetGridTheme.item` a genuine fit, unlike the row-shaped lists here) -
+not started, no immediate plan, current Assets tab is "functional
+as-is."
+
+### Phase 7: vanilla module reuse built, not yet confirmed in-game (2026-10-12)
+Revisits the item Phase 6 of `UI_OVERHAUL_PLAN.md` explicitly deferred
+("getModule()-based vanilla theme reuse... worth revisiting only if the
+above still looks visibly 'off'") - triggered now by `UI_STYLE_GUIDE.md`
+(a cloud session's research) plus a Reddit question. See that plan's
+new "Phase 7" section for the full breakdown of what was built
+(`THIRD_PARTY_NOTICES.md`, `UI/src/vanilla/VanillaComponentResolver.tsx`
+trimmed to one entry, `TextInputTheme.ts`, the `ListRow.module.scss`/raw-
+`<input>` retrofits) - this entry covers the two things worth a
+dedicated record.
+
+**Every vanilla module path/class claim was independently verified
+against the actually-installed game before use, not trusted from the
+style guide on faith** - matching Phase 6's own precedent of grepping
+`Content/Game/UI/index.css` for its CSS tokens. Here: grepped the
+installed `Content/Game/UI/index.js` directly for the literal module
+path strings `game-ui/game/components/item-grid/item-grid.module.scss`
+and `game-ui/editor/widgets/item/editor-item.module.scss`, and for each
+one's `classes` object literal, confirming `classes.item` (item-grid)
+and `classes.input` (editor-item) are real exports with the exact
+hashed class names claimed. Additionally fetched Road Builder's actual
+`TextInput.tsx` source from GitHub to confirm `editor-item.module.scss`
+really is where its `TextInputTheme.input` comes from (a one-off
+`getModule` call in Road Builder's own code, not routed through its
+shared resolver, which doesn't register that module at all) - the style
+guide's attribution turned out to be correct, but confirmed rather than
+assumed.
+
+### px vs rem in base.scss (2026-10-12)
+`UI/src/shared/base.scss` already existed before `UI_STYLE_GUIDE.md`
+was written (its own px-based `$space-*` spacing scale, deliberately
+color-free - colors come from the game's own CSS vars instead). The
+style guide's section 3 argues for `rem` everywhere, since Coherent/
+Gameface scales `rem` with resolution and doesn't scale `px`. Decided
+**not** to migrate the existing scale: it's already visually confirmed
+in-game across every tab (Phase 6), and converting it wholesale risks
+regressing confirmed-working spacing for a scaling concern that's never
+actually been observed as a bug at any tested resolution - only a
+theoretical one from the style guide's own general advice, not something
+this project hit.
+
+Instead, the one Road Builder-derived mixin Phase 7.4 actually needed
+(`textInputBasic`) was added in its own clearly-labeled, rem-based
+section of `base.scss` (matching Road Builder's own source values,
+unconverted), coexisting with the px scale rather than unifying them.
+Two unit systems in one file, in clearly separated sections, is an
+accepted tradeoff here, not a defect to paper over. A full px→rem
+migration stays a possible future phase, only if real multi-resolution
+in-game testing ever surfaces an actual scaling bug - not built
+speculatively ahead of that.
+
+### Level 1 warning moved to the collection, not the zone attach (2026-10-12)
+Follow-up to "Warn before attaching a collection with no Level 1
+building" (below) - tested in-game and the warning never showed up. Root
+cause wasn't a logic bug: the check only ever lived in
+`ZoneUISystem.OnAddCollectionToZone`, which fires once, at the moment an
+*existing* collection gets attached to a zone. The actual test (and, on
+reflection, the natural way most people build a collection) was build a
+collection standalone, populate it fully, save it - never attach it to
+anything in the same session. Nothing wrong happened; there was just
+nothing to check yet.
+
+That surfaced the real design mismatch: the user's own framing was "the
+point in the user journey where users are interacting with the assets,
+issues surrounding their choices should be flagged ASAP" - attach time
+is not that moment, asset-editing time is. Moved the whole feature:
+
+- `CustomZoneBuilder.HasLevel1Candidate(ZoneType, IEnumerable<Collection>)`
+  (needed a zone's base type to check against) replaced with
+  `FindZoneTypesMissingLevel1(Collection)` - self-contained, no zone
+  dependency. Finds every zone type the collection's *own* entries
+  resolve to that has zero Level 1 candidates among them, so a mixed-
+  zone-type collection gets checked per zone type, not as a single
+  pass/fail.
+- `ZoneUISystem.OnAddCollectionToZone` reverted to a plain, immediate
+  attach - no check, no defer, no `Level1Warning` binding/triggers. A
+  zone attach was never actually the right place for this once the check
+  stopped needing a zone's base type to run.
+- `CollectionUISystem` gained the check instead, fired once by a new
+  `FinishEditingCollectionAssets` trigger from the Assets tab's "Done"
+  button (`ShellFeature.finishAddingAssets`) - the actual moment the user
+  finishes choosing a collection's assets, independent of whether/when
+  it's ever attached to a zone. Purely informational now, not a confirm/
+  cancel gate: add/remove already commits immediately per-row (decision
+  #3 in `UI_OVERHAUL_PLAN.md`), so there's nothing left to cancel by the
+  time this fires - one dismiss button, no "attach anyway."
+- `Level1WarningEntry` replaced with `CollectionLevel1WarningEntry`
+  (collection id/name + the list of missing zone types, no zone fields at
+  all). Banner moved from `ZonesTab.tsx` to `CollectionsTab.tsx`'s
+  `CollectionDetail`, filtered to the collection it's actually about so
+  a still-pending warning doesn't bleed into a different collection's
+  detail view.
+- Incidentally fixes the one known rough edge the old version had (an
+  empty collection always warned, even via "Create Collection and Add to
+  Zone") - an empty collection has no zone types represented at all now,
+  so there's nothing to flag.
+
+Confirmed: full build (C# + UI) succeeds, all 33 Core tests pass.
+**Not yet tested in-game** - the real test is adding only non-Level-1
+assets to a collection, clicking "Done," and confirming the banner
+appears naming the right missing zone type(s); and confirming it does
+NOT appear when attaching/detaching that same collection from a zone
+afterward (the old trigger point, now removed).
+
+### Warn before attaching a collection with no Level 1 building (2026-10-12, superseded above)
 Follow-up to "A collection with no Level 1 building can never spawn
 anything" - that was found and diagnosed after the fact (a confusing
 hour of "nothing spawns despite demand"), not caught up front. Rather
