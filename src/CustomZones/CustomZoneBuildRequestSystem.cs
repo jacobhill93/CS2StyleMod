@@ -78,12 +78,12 @@ namespace ZoneBuilder.CustomZones
         }
 
         // Unlike Request above, this is NOT queued - it's a pure,
-        // immediate read (see CustomZoneBuilder.HasLevel1Candidate's own
-        // comment), safe to call directly from a UI trigger without
+        // immediate read (see CustomZoneBuilder.FindZoneTypesMissingLevel1's
+        // own comment), safe to call directly from a UI trigger without
         // waiting for a frame.
-        public bool HasLevel1Candidate(Core.ZoneType baseZoneType, IEnumerable<Collection> collections)
+        public IReadOnlyCollection<Core.ZoneType> FindZoneTypesMissingLevel1(Collection collection)
         {
-            return m_Builder.HasLevel1Candidate(baseZoneType, collections);
+            return m_Builder.FindZoneTypesMissingLevel1(collection);
         }
 
         // Same "safe to call from anywhere, actually runs later at the

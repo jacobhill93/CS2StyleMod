@@ -59,41 +59,53 @@ namespace ZoneBuilder.CustomZones
             m_ZoneResolver = new GameZonePrefabResolver(world);
         }
 
-        // Pure lookup, no mutation - lets a caller check *before*
-        // committing whether a prospective set of collections would give
-        // a zone any Level 1 candidate for its base type. Exists because
-        // ZoneSpawnSystem only ever considers Level 1 for a fresh spawn
-        // on an empty lot (confirmed via decompiled source) - a zone
-        // whose collections are, say, entirely Level 3-5 can never grow
-        // anything from scratch, no error, just silent "nothing spawns."
-        // See DECISIONS.md "A collection with no Level 1 building can
-        // never spawn anything" for the original, harder-to-diagnose
-        // version of this. ZoneUISystem uses this to warn before
-        // attaching a collection that would leave a zone in that state,
-        // rather than after the fact.
-        public bool HasLevel1Candidate(Core.ZoneType baseZoneType, IEnumerable<Collection> collections)
+        // Pure lookup, no mutation - finds every zone type a collection's
+        // own entries resolve to that has NO Level 1 candidate among them.
+        // Exists because ZoneSpawnSystem only ever considers Level 1 for a
+        // fresh spawn on an empty lot (confirmed via decompiled source) -
+        // a collection that's entirely Level 3-5 for some zone type can
+        // never grow anything from scratch there, no error, just silent
+        // "nothing spawns." See DECISIONS.md "A collection with no Level 1
+        // building can never spawn anything" for the original, harder-to-
+        // diagnose version of this, and "Level 1 warning moved to the
+        // collection, not the zone attach" for why this checks a single
+        // collection in isolation rather than a zone's prospective set:
+        // CollectionUISystem calls this when the user finishes editing a
+        // collection's assets, before it's ever necessarily attached to
+        // any zone at all. Deliberately collection-centric, not zone-type-
+        // parameterized - a collection can carry entries for more than one
+        // zone type, and each one gets checked on its own.
+        public IReadOnlyCollection<Core.ZoneType> FindZoneTypesMissingLevel1(Collection collection)
         {
-            foreach (var entry in EnumerateEntries(collections))
+            var zoneTypesPresent = new HashSet<Core.ZoneType>();
+            var zoneTypesWithLevel1 = new HashSet<Core.ZoneType>();
+
+            foreach (var entry in EnumerateEntries(new[] { collection }))
             {
                 switch (entry)
                 {
                     case VanillaSelectorEntry selector:
                         foreach (var candidate in m_Catalog.Resolve(selector))
                         {
-                            if (candidate.ZoneType == baseZoneType && candidate.Level == 1)
-                                return true;
+                            zoneTypesPresent.Add(candidate.ZoneType);
+                            if (candidate.Level == 1)
+                                zoneTypesWithLevel1.Add(candidate.ZoneType);
                         }
                         break;
 
                     case ExplicitAssetEntry explicitEntry:
-                        if (m_Catalog.TryResolve(explicitEntry, out var explicitCandidate) &&
-                            explicitCandidate.ZoneType == baseZoneType && explicitCandidate.Level == 1)
-                            return true;
+                        if (m_Catalog.TryResolve(explicitEntry, out var explicitCandidate))
+                        {
+                            zoneTypesPresent.Add(explicitCandidate.ZoneType);
+                            if (explicitCandidate.Level == 1)
+                                zoneTypesWithLevel1.Add(explicitCandidate.ZoneType);
+                        }
                         break;
                 }
             }
 
-            return false;
+            zoneTypesPresent.ExceptWith(zoneTypesWithLevel1);
+            return zoneTypesPresent;
         }
 
         // Builds definition fresh the first time, or rebuilds it in place

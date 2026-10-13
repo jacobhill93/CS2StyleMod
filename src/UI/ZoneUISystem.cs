@@ -24,12 +24,6 @@ namespace ZoneBuilder.UI
         private ValueBindingHelper<ZoneUIEntry[]> m_Zones;
         private CustomZoneBuildRequestSystem m_BuildRequestSystem;
 
-        // Set together, always, by OnAddCollectionToZone when it defers
-        // instead of attaching immediately - see that method's own
-        // comment, and CustomZoneBuilder.HasLevel1Candidate's.
-        private Guid? m_PendingWarningZoneId;
-        private Guid? m_PendingWarningCollectionId;
-
         protected override void OnCreate()
         {
             base.OnCreate();
@@ -45,20 +39,11 @@ namespace ZoneBuilder.UI
             // to hang a refresh off of.
             CreateBinding<ZoneBuildProgressEntry>("BuildProgress", GetBuildProgress);
 
-            // Also getter-based - this one's trivially mutation-driven
-            // (OnAddCollectionToZone/OnConfirmAddCollectionDespiteWarning/
-            // OnCancelPendingCollectionWarning are the only writers), but
-            // reusing the same pattern keeps this consistent with
-            // BuildProgress rather than mixing styles for no reason.
-            CreateBinding<Level1WarningEntry>("Level1Warning", GetLevel1Warning);
-
             CreateTrigger<string, string, string, string>("CreateZone", OnCreateZone);
             CreateTrigger<string>("DeleteZone", OnDeleteZone);
             CreateTrigger<string, string>("RenameZone", OnRenameZone);
             CreateTrigger<string, string>("AddCollectionToZone", OnAddCollectionToZone);
             CreateTrigger<string, string>("RemoveCollectionFromZone", OnRemoveCollectionFromZone);
-            CreateTrigger("ConfirmAddCollectionDespiteWarning", OnConfirmAddCollectionDespiteWarning);
-            CreateTrigger("CancelPendingCollectionWarning", OnCancelPendingCollectionWarning);
         }
 
         private ZoneBuildProgressEntry GetBuildProgress()
@@ -67,22 +52,6 @@ namespace ZoneBuilder.UI
             return progress.HasValue
                 ? new ZoneBuildProgressEntry(true, progress.Value.ZoneName, progress.Value.Completed, progress.Value.Total)
                 : ZoneBuildProgressEntry.Inactive;
-        }
-
-        private Level1WarningEntry GetLevel1Warning()
-        {
-            if (!m_PendingWarningZoneId.HasValue || !m_PendingWarningCollectionId.HasValue)
-                return Level1WarningEntry.Inactive;
-
-            var zoneName = Mod.CustomZoneDefinitionLibrary.TryGet(m_PendingWarningZoneId.Value, out var zoneDef) ? zoneDef.Name : "";
-            var collectionName = Mod.CollectionLibrary.TryGet(m_PendingWarningCollectionId.Value, out var collection) ? collection.Name : "";
-
-            return new Level1WarningEntry(
-                true,
-                m_PendingWarningZoneId.Value.ToString(),
-                zoneName,
-                m_PendingWarningCollectionId.Value.ToString(),
-                collectionName);
         }
 
         // The actual bug behind "a zone I created in an earlier session
@@ -178,61 +147,19 @@ namespace ZoneBuilder.UI
             RefreshZones();
         }
 
-        // Checks before committing, not after - see
-        // CustomZoneBuilder.HasLevel1Candidate's own comment for why.
-        // Checks the FULL prospective set (every collection the zone
-        // already has, plus this new one), not just the new collection
-        // in isolation - the zone might already have a Level 1 candidate
-        // from an existing collection, which would otherwise be a false
-        // positive. Defers to a pending-confirmation round trip
-        // (m_PendingWarning*/Level1Warning binding) instead of attaching
-        // immediately when there's no Level 1 candidate at all; the
-        // actual attach only happens from CommitAddCollectionToZone,
-        // called either directly here (no warning needed) or from
-        // OnConfirmAddCollectionDespiteWarning (user clicked through).
+        // No Level 1 check here anymore - see DECISIONS.md "Level 1
+        // warning moved to the collection, not the zone attach" - that
+        // check now happens in CollectionUISystem.OnFinishEditingCollectionAssets,
+        // at the point the user actually finishes choosing a collection's
+        // assets, not here at attach time. Attaching always commits
+        // immediately.
         private void OnAddCollectionToZone(string zoneId, string collectionId)
         {
             if (!Guid.TryParse(zoneId, out var zoneGuid) || !Guid.TryParse(collectionId, out var collectionGuid))
                 return;
             if (!Mod.CustomZoneDefinitionLibrary.TryGet(zoneGuid, out var definition))
                 return;
-            if (!Mod.CollectionLibrary.TryGet(collectionGuid, out var collectionToAdd))
-                return;
-
-            var prospectiveCollections = ResolveCollections(definition).Append(collectionToAdd);
-            if (!m_BuildRequestSystem.HasLevel1Candidate(definition.BaseZoneType, prospectiveCollections))
-            {
-                m_PendingWarningZoneId = zoneGuid;
-                m_PendingWarningCollectionId = collectionGuid;
-                Mod.log.Warn($"[ZoneUISystem] Attaching collection '{collectionToAdd.Name}' to zone '{definition.Name}' would leave it with no Level 1 building for {definition.BaseZoneType} - nothing would spawn fresh on an empty lot. Awaiting user confirmation.");
-                return;
-            }
-
-            CommitAddCollectionToZone(zoneGuid, collectionGuid);
-        }
-
-        private void OnConfirmAddCollectionDespiteWarning()
-        {
-            if (m_PendingWarningZoneId.HasValue && m_PendingWarningCollectionId.HasValue)
-                CommitAddCollectionToZone(m_PendingWarningZoneId.Value, m_PendingWarningCollectionId.Value);
-
-            ClearPendingWarning();
-        }
-
-        private void OnCancelPendingCollectionWarning()
-        {
-            ClearPendingWarning();
-        }
-
-        private void ClearPendingWarning()
-        {
-            m_PendingWarningZoneId = null;
-            m_PendingWarningCollectionId = null;
-        }
-
-        private void CommitAddCollectionToZone(Guid zoneGuid, Guid collectionGuid)
-        {
-            if (!Mod.CustomZoneDefinitionLibrary.TryGet(zoneGuid, out var definition))
+            if (!Mod.CollectionLibrary.TryGet(collectionGuid, out _))
                 return;
 
             definition.AddCollection(collectionGuid);

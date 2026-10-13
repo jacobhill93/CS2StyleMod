@@ -1,7 +1,8 @@
-import { useValue } from "cs2/api";
+import { trigger, useValue } from "cs2/api";
 import { Button, Panel } from "cs2/ui";
 import { useState } from "react";
 import classNames from "classnames";
+import mod from "../../../mod.json";
 import { fpsMeterLevel$ } from "shared/fpsMeter";
 import { closeShell, shellVisible$ } from "shared/shellVisibility";
 import { ZonesTab } from "./tabs/ZonesTab";
@@ -49,6 +50,12 @@ export const ShellFeature = () => {
     };
 
     const finishAddingAssets = () => {
+        // Fires the one-shot Level 1 check here, not per add/remove click -
+        // see DECISIONS.md "Level 1 warning moved to the collection, not
+        // the zone attach": the user is "finalizing asset addition" the
+        // moment they click Done, which is exactly this call site.
+        if (focusedCollectionId) trigger(mod.id, "FinishEditingCollectionAssets", focusedCollectionId);
+
         // Keep focusedCollectionId set - CollectionsTab reads it back as
         // initialSelectedCollectionId so the same collection's detail
         // view reopens instead of dropping back to the list. Cleared the

@@ -25,12 +25,27 @@ namespace ZoneBuilder.UI
     public partial class CollectionUISystem : ExtendedUISystemBase
     {
         private ValueBindingHelper<CollectionUIEntry[]> m_Collections;
+        private CustomZones.CustomZoneBuildRequestSystem m_BuildRequestSystem;
+
+        // Set by OnFinishEditingCollectionAssets, cleared by
+        // OnDismissCollectionLevel1Warning or by GetCollectionLevel1Warning
+        // itself once the gap is fixed - see that method's comment.
+        private Guid? m_PendingLevel1WarningCollectionId;
 
         protected override void OnCreate()
         {
             base.OnCreate();
 
+            m_BuildRequestSystem = World.GetOrCreateSystemManaged<CustomZones.CustomZoneBuildRequestSystem>();
+
             m_Collections = CreateBinding("Collections", GetEntries());
+
+            // Getter-based, not "set .Value on mutation" - see
+            // ZoneBuildProgressEntry's comment for why that pattern exists;
+            // reused here because GetCollectionLevel1Warning also needs to
+            // self-clear once the gap it flagged is fixed, which a plain
+            // mutation-driven binding can't express as cleanly.
+            CreateBinding<CollectionLevel1WarningEntry>("CollectionLevel1Warning", GetCollectionLevel1Warning);
 
             // Takes a client-generated id (chunk 5) rather than letting
             // Collection's own Guid.NewGuid() ctor pick one, so the caller
@@ -47,6 +62,17 @@ namespace ZoneBuilder.UI
             // current, same reasoning as the other triggers above.
             CreateTrigger<string, string>("AddBuildingToCollection", OnAddBuildingToCollection);
             CreateTrigger<string, string>("RemoveBuildingFromCollection", OnRemoveBuildingFromCollection);
+
+            // Fired once, when the user clicks "Done" in the Assets tab's
+            // picking mode (ShellFeature.finishAddingAssets) - see
+            // DECISIONS.md "Level 1 warning moved to the collection, not
+            // the zone attach" for why this replaced the old zone-attach-
+            // time check entirely: that check never fired for a collection
+            // built/edited standalone and attached to a zone later (or
+            // never attached at all), which is the common case for how
+            // collections actually get built in practice.
+            CreateTrigger<string>("FinishEditingCollectionAssets", OnFinishEditingCollectionAssets);
+            CreateTrigger("DismissCollectionLevel1Warning", OnDismissCollectionLevel1Warning);
         }
 
         private void OnCreateCollection(string id, string name)
@@ -117,6 +143,55 @@ namespace ZoneBuilder.UI
                 return;
 
             RefreshCollections();
+        }
+
+        // Purely informational - the add/remove that got us here already
+        // committed (decision #3 in UI_OVERHAUL_PLAN.md: one-click-
+        // immediate, no batch confirm step), so there's nothing to cancel.
+        // Checks the collection's actual final state, not just "did this
+        // session add a non-L1 building" - catches the case where it was
+        // already missing an L1 before this editing session even started.
+        private void OnFinishEditingCollectionAssets(string collectionId)
+        {
+            if (!Guid.TryParse(collectionId, out var guid) || !Mod.CollectionLibrary.TryGet(guid, out var collection))
+                return;
+
+            var missing = m_BuildRequestSystem.FindZoneTypesMissingLevel1(collection);
+            m_PendingLevel1WarningCollectionId = missing.Count > 0 ? guid : (Guid?)null;
+
+            if (missing.Count > 0)
+                Mod.log.Warn($"[CollectionUISystem] Collection '{collection.Name}' has no Level 1 building for: {string.Join(", ", missing)} - it won't spawn anything fresh on an empty lot for those zone types.");
+        }
+
+        private void OnDismissCollectionLevel1Warning()
+        {
+            m_PendingLevel1WarningCollectionId = null;
+        }
+
+        // Getter-based (see OnCreate's comment) specifically so it also
+        // self-clears: if the user went back into the picker and fixed the
+        // gap (added an L1 building) without explicitly dismissing first,
+        // re-checking here rather than trusting the stale m_Pending* flag
+        // means the banner doesn't linger past the point it's still true.
+        private CollectionLevel1WarningEntry GetCollectionLevel1Warning()
+        {
+            if (!m_PendingLevel1WarningCollectionId.HasValue)
+                return CollectionLevel1WarningEntry.Inactive;
+            if (!Mod.CollectionLibrary.TryGet(m_PendingLevel1WarningCollectionId.Value, out var collection))
+                return CollectionLevel1WarningEntry.Inactive;
+
+            var missing = m_BuildRequestSystem.FindZoneTypesMissingLevel1(collection);
+            if (missing.Count == 0)
+            {
+                m_PendingLevel1WarningCollectionId = null;
+                return CollectionLevel1WarningEntry.Inactive;
+            }
+
+            return new CollectionLevel1WarningEntry(
+                true,
+                m_PendingLevel1WarningCollectionId.Value.ToString(),
+                collection.Name,
+                missing.Select(z => z.ToString()).ToArray());
         }
 
         private void RefreshCollections()

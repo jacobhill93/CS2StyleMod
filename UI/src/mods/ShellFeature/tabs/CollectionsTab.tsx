@@ -7,6 +7,9 @@ import { generateGuid } from "shared/generateGuid";
 import { Icons } from "shared/icons";
 import rowStyles from "shared/ListRow.module.scss";
 import { BuildingThumbnail } from "shared/BuildingThumbnail";
+import styles from "./CollectionsTab.module.scss";
+import inputStyles from "shared/TextInput.module.scss";
+import { TextInputTheme } from "vanilla/TextInputTheme";
 
 interface BuildingEntry {
     prefabId: string;
@@ -28,6 +31,27 @@ interface CollectionEntry {
 
 const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
 const Buildings$ = bindValue<BuildingEntry[]>(mod.id, "Buildings", []);
+
+// Mirrors UI.CollectionLevel1WarningEntry (src/UI/CollectionLevel1WarningEntry.cs) -
+// see that file's and CollectionUISystem.OnFinishEditingCollectionAssets's
+// comments. Fires once, when the user finishes editing a collection's
+// assets (the Assets tab's "Done" button) - not at zone-attach time
+// anymore (DECISIONS.md "Level 1 warning moved to the collection, not the
+// zone attach"). Purely informational: the edit that triggered it already
+// committed, there's nothing to confirm/cancel.
+interface CollectionLevel1WarningEntry {
+    active: boolean;
+    collectionId: string;
+    collectionName: string;
+    missingZoneTypes: string[];
+}
+
+const CollectionLevel1Warning$ = bindValue<CollectionLevel1WarningEntry>(mod.id, "CollectionLevel1Warning", {
+    active: false,
+    collectionId: "",
+    collectionName: "",
+    missingZoneTypes: [],
+});
 
 interface CollectionsTabProps {
     // "+ Add Assets" switches the shell to the Assets tab in picking
@@ -162,6 +186,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                             if (nameError) setNameError(false);
                         }}
                         placeholder="New collection name"
+                        className={classNames(TextInputTheme.input, inputStyles.input)}
                         style={{ flex: 1 }}
                     />
                     <Button onSelect={onCreate}>Create</Button>
@@ -191,6 +216,7 @@ const CollectionDetail = ({ collection, buildings, onBack, onAddAssets }: Collec
                     {collection.name}
                 </span>
             </div>
+            <CollectionLevel1WarningBanner collectionId={collection.id} />
             <Scrollable vertical style={{ height: "220px" }}>
                 {members.length === 0 && (
                     <div className={rowStyles.emptyState}>No assets in this collection yet.</div>
@@ -215,5 +241,25 @@ const CollectionDetail = ({ collection, buildings, onBack, onAddAssets }: Collec
                 <Button onSelect={onAddAssets}>+ Add Assets</Button>
             </div>
         </>
+    );
+};
+
+// Only rendered for the collection it's actually about - a warning raised
+// for a different collection (e.g. still pending after switching detail
+// views without dismissing it) shouldn't bleed into this one.
+const CollectionLevel1WarningBanner = ({ collectionId }: { collectionId: string }) => {
+    const warning = useValue(CollectionLevel1Warning$);
+    if (!warning.active || warning.collectionId !== collectionId) return null;
+
+    return (
+        <div className={styles.level1WarningBanner}>
+            <span className={styles.level1WarningText}>
+                "{warning.collectionName}" has no Level 1 building for: {warning.missingZoneTypes.join(", ")} - it
+                won't spawn anything fresh on an empty lot for those zone types.
+            </span>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <Button onSelect={() => trigger(mod.id, "DismissCollectionLevel1Warning")}>OK</Button>
+            </div>
+        </div>
     );
 };

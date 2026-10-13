@@ -1,6 +1,9 @@
 import { Button } from "cs2/ui";
+import classNames from "classnames";
 import { FilterDropdown } from "shared/FilterDropdown";
 import { useBuildingFilters } from "shared/useBuildingFilters";
+import { TextInputTheme } from "vanilla/TextInputTheme";
+import inputStyles from "shared/TextInput.module.scss";
 
 // The render half of useBuildingFilters - split out so both the Phase 4
 // picker dialog and the Phase 4b Assets tab render an identical filter
@@ -14,7 +17,8 @@ export const BuildingFilterBar = (filters: ReturnType<typeof useBuildingFilters>
             value={filters.nameFilter}
             onChange={(event) => filters.setNameFilter(event.target.value)}
             placeholder="Search name"
-            style={{ width: "100%", boxSizing: "border-box", padding: "6px 8px", fontSize: "13px", marginBottom: "6px" }}
+            className={classNames(TextInputTheme.input, inputStyles.input)}
+            style={{ width: "100%", boxSizing: "border-box", marginBottom: "6px" }}
         />
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             <FilterDropdown label="Any zone" options={filters.zoneTypes} value={filters.zoneTypeFilter} onChange={filters.setZoneTypeFilter} />

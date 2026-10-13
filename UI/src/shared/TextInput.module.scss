@@ -1,0 +1,12 @@
+@use "base";
+
+// UI_OVERHAUL_PLAN.md Phase 7.4 - shared chrome for every plain <input>
+// in the shell (search/filter boxes, create-row name fields), replacing
+// each one's own ad hoc inline style object. Paired with the vanilla
+// TextInputTheme.input class (UI/src/vanilla/TextInputTheme.ts) at each
+// call site - this class only supplies the mixin's look, not vanilla's,
+// so both are needed together. Layout (width/flex/margin) stays inline
+// per call site, since that genuinely differs by context.
+.input {
+    @include base.textInputBasic;
+}

@@ -8,6 +8,8 @@ import { ANY, FilterDropdown } from "shared/FilterDropdown";
 import { Icons } from "shared/icons";
 import rowStyles from "shared/ListRow.module.scss";
 import styles from "./ZonesTab.module.scss";
+import inputStyles from "shared/TextInput.module.scss";
+import { TextInputTheme } from "vanilla/TextInputTheme";
 
 interface CollectionEntry {
     id: string;
@@ -35,21 +37,6 @@ interface BuildProgressEntry {
     zoneName: string;
     completed: number;
     total: number;
-}
-
-// Mirrors UI.Level1WarningEntry (src/UI/Level1WarningEntry.cs) - see
-// that file's and ZoneUISystem.OnAddCollectionToZone's comments. Active
-// when attaching a collection would leave a zone with no Level 1
-// candidate for its base type - ZoneSpawnSystem only ever considers
-// Level 1 for a fresh spawn, so that zone would silently never spawn
-// anything on an empty lot (see DECISIONS.md "A collection with no
-// Level 1 building can never spawn anything").
-interface Level1WarningEntry {
-    active: boolean;
-    zoneId: string;
-    zoneName: string;
-    collectionId: string;
-    collectionName: string;
 }
 
 // Mirrors Core.ZoneType exactly (src/Core/Primitives.cs) - see ZonePanel's
@@ -83,14 +70,6 @@ const BuildProgress$ = bindValue<BuildProgressEntry>(mod.id, "BuildProgress", {
     completed: 0,
     total: 0,
 });
-const Level1Warning$ = bindValue<Level1WarningEntry>(mod.id, "Level1Warning", {
-    active: false,
-    zoneId: "",
-    zoneName: "",
-    collectionId: "",
-    collectionName: "",
-});
-
 // UI_OVERHAUL_PLAN.md Phase 2: ports ZonePanel's list/Create/delete-
 // confirmation/empty-state into the shell's Zones tab, and adds the
 // list->detail navigation the wireframe calls for (section B) - a zone
@@ -115,7 +94,6 @@ export const ZonesTab = () => {
     return (
         <>
             <BuildProgressBanner progress={buildProgress} />
-            <Level1WarningBanner />
             {selectedZone ? (
                 <ZoneDetail zone={selectedZone} collections={collections} onBack={() => setSelectedZoneId(null)} />
             ) : (
@@ -138,30 +116,6 @@ const BuildProgressBanner = ({ progress }: { progress: BuildProgressEntry }) => 
             <span className={styles.buildProgressText}>
                 Building "{progress.zoneName}"... {progress.completed}/{progress.total}
             </span>
-        </div>
-    );
-};
-
-// Pending-confirmation prompt, not a passive warning - attaching is
-// deferred server-side (ZoneUISystem.m_PendingWarning*) until the user
-// picks one of these two buttons, same "shown above either sub-view"
-// reasoning as BuildProgressBanner above (attaching a collection only
-// happens from the detail view, but the zone list is still navigable
-// while this is pending).
-const Level1WarningBanner = () => {
-    const warning = useValue(Level1Warning$);
-    if (!warning.active) return null;
-
-    return (
-        <div className={styles.level1WarningBanner}>
-            <span className={styles.level1WarningText}>
-                "{warning.collectionName}" has no Level 1 building for "{warning.zoneName}"'s zone type - nothing will
-                spawn fresh on an empty lot. Attach anyway?
-            </span>
-            <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
-                <Button onSelect={() => trigger(mod.id, "CancelPendingCollectionWarning")}>Cancel</Button>
-                <Button onSelect={() => trigger(mod.id, "ConfirmAddCollectionDespiteWarning")}>Attach Anyway</Button>
-            </div>
         </div>
     );
 };
@@ -249,6 +203,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                             if (createError) setCreateError(false);
                         }}
                         placeholder="New zone name"
+                        className={classNames(TextInputTheme.input, inputStyles.input)}
                         style={{ flex: 1 }}
                     />
                     <FilterDropdown
@@ -360,6 +315,7 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                         value={newCollectionName}
                         onChange={(event) => setNewCollectionName(event.target.value)}
                         placeholder="New collection name"
+                        className={classNames(TextInputTheme.input, inputStyles.input)}
                         style={{ flex: 1 }}
                     />
                     <Button onSelect={onCreateAndAttach}>Create Collection and Add to Zone</Button>
