@@ -2,6 +2,37 @@
 
 ## Decisions
 
+### EllipsisTextInput's Escape key can't be made to cancel - accepted as-is (2026-10-13)
+`UI_UPGRADE_GUIDE.md` Phase 3b swapped the rename fields (`shared/
+RenameableTitle.tsx`) from Phase 3a's plain `<input>` to the real
+vanilla `EllipsisTextInput` component for the native look. Focus+select-
+on-open and Enter-commits both worked immediately, confirmed in-game -
+but Escape, which Phase 3a correctly treated as cancel-and-discard,
+instead committed the typed name, same as Enter.
+
+Two fix attempts, both confirmed to have zero effect in-game: first, a
+plain `onKeyDown` branch calling a `cancel()` that skipped the rename
+trigger; second, a ref-based flag meant to suppress the `onBlur`-
+triggered commit specifically when Escape caused it. Neither changed
+the observed behavior at all - not even partially - which points away
+from a timing race and toward the key never reaching a DOM `keydown`
+listener as plain React synthetic events in the first place. Reading
+the compiled component (`Content/Game/UI/index.js`) shows it renders a
+"Back"/"Select" hint tied to focus state - strong evidence this is the
+game's own input-action system (gamepad/keyboard action bindings, not
+raw DOM events) consuming Escape internally as its own "Back" gesture,
+which this component apparently treats as "confirm and exit," not
+"discard." Overriding that would need reverse-engineering how `Bp`/`_I`
+(the component's internal focus-scope and input primitives, minified
+names) actually implement that action - deeper investigation with no
+guaranteed payoff.
+
+**Accepted, user's call**: kept `EllipsisTextInput` for the native
+look; Escape behaves like Enter/blur here instead of canceling. Not
+pursued further. If a real cancel gesture is ever needed, the fallback
+is reverting this one component back to Phase 3a's plain `<input>`,
+which already supports it correctly.
+
 ### Migrated to one file per collection (and per custom zone) (2026-10-12)
 Prompted by a direct question: "why cannot zone and collections just be
 a separate file for each? would this not protect better against a

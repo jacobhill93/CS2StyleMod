@@ -37,12 +37,12 @@ Files in this repo adapted or copied from it:
 - `src/UI/ExtendedUISystemBase.cs` - adapted from `RoadBuilder/Systems/UI/ExtendedUISystemBase.cs`. Namespace and the `Group` constant changed for this project; every API it depends on re-confirmed against this project's own installed game DLLs (see the file's own header and DECISIONS.md).
 - `UI/src/vanilla/TextInputTheme.ts` - copied from the pattern in `RoadBuilder/UI/src/mods/Components/TextInput/TextInput.tsx` (the `TextInputTheme` export specifically - a one-off `getModule` call Road Builder itself doesn't route through its resolver either).
 - `UI/src/shared/base.scss` - the `textInputBasic` mixin is copied from `RoadBuilder/UI/src/mods/base.scss`, kept in its own clearly-labeled section (see that file's own comment) rather than merged into this project's pre-existing, independently-written spacing scale.
+- `UI/src/vanilla/EllipsisTextInput.ts` - prop shape taken from Road Builder's own guessed type for this export as a starting hypothesis (`RoadBuilder/UI/src/vanillacomponentresolver.tsx`), then corrected against this project's own installed game bundle rather than trusted as-is - see the file's own header comment for what changed.
 
 ## Find It (all rights reserved)
 
 https://github.com/JadHajjar/FindIt-CSII - no license. Nothing has been
 copied from this project; only its publicly observable *patterns* (which
 vanilla module paths it reads, its docking approach) have ever informed
-a design discussion - see `UI_STYLE_GUIDE.md` and `UI_OVERHAUL_PLAN.md`
-for where that's referenced. Reimplemented independently wherever used,
-never copied.
+a design discussion - see `UI_OVERHAUL_PLAN.md` for where that's
+referenced. Reimplemented independently wherever used, never copied.
