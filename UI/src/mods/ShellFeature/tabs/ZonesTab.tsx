@@ -8,8 +8,7 @@ import { ANY, FilterDropdown } from "shared/FilterDropdown";
 import { Icons } from "shared/icons";
 import rowStyles from "shared/ListRow.module.scss";
 import styles from "./ZonesTab.module.scss";
-import inputStyles from "shared/TextInput.module.scss";
-import { TextInputTheme } from "vanilla/TextInputTheme";
+import { TextInput } from "shared/TextInput";
 import { RenameableTitle } from "shared/RenameableTitle";
 import { CollectionEntry } from "shared/CollectionEntry";
 
@@ -191,14 +190,14 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
             </Scrollable>
             <div className={rowStyles.createRowWrapper}>
                 <div className={rowStyles.createRowGroup}>
-                    <input
+                    <TextInput
                         value={newName}
-                        onChange={(event) => {
-                            setNewName(event.target.value);
+                        onChange={(value) => {
+                            setNewName(value);
                             if (createError) setCreateError(false);
                         }}
                         placeholder="New zone name"
-                        className={classNames(TextInputTheme.input, inputStyles.input, rowStyles.createRowInput)}
+                        className={rowStyles.createRowInput}
                     />
                     <FilterDropdown
                         label="Base type"
@@ -306,11 +305,11 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                     </Button>
                 </div>
                 <div className={rowStyles.createRowGroup}>
-                    <input
+                    <TextInput
                         value={newCollectionName}
-                        onChange={(event) => setNewCollectionName(event.target.value)}
+                        onChange={setNewCollectionName}
                         placeholder="New collection name"
-                        className={classNames(TextInputTheme.input, inputStyles.input, rowStyles.createRowInput)}
+                        className={rowStyles.createRowInput}
                     />
                     <Button onSelect={onCreateAndAttach}>Create Collection and Add to Zone</Button>
                 </div>

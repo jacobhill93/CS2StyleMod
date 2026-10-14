@@ -1,12 +1,35 @@
 @use "base";
 
 // UI_OVERHAUL_PLAN.md Phase 7.4 - shared chrome for every plain <input>
-// in the shell (search/filter boxes, create-row name fields), replacing
-// each one's own ad hoc inline style object. Paired with the vanilla
-// TextInputTheme.input class (UI/src/vanilla/TextInputTheme.ts) at each
-// call site - this class only supplies the mixin's look, not vanilla's,
-// so both are needed together. Layout (width/flex/margin) stays inline
-// per call site, since that genuinely differs by context.
+// in the shell (search/filter boxes, create-row name fields), used via
+// the shared/TextInput.tsx component rather than duplicated at each
+// call site. Paired with the vanilla TextInputTheme.input class
+// (UI/src/vanilla/TextInputTheme.ts) inside that component - this class
+// only supplies the mixin's look, not vanilla's, so both are needed
+// together.
+.wrapper {
+    position: relative;
+}
+
+// width/box-sizing live here, not per call site, so the actual <input>
+// always fills whatever size its wrapper ends up being (the wrapper is
+// what call sites size via their own layout class - flex: 1, width:
+// 100%, margin - passed as TextInput's className prop).
 .input {
     @include base.textInputBasic;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+// Placeholder-text overlay - see TextInput.tsx for why. Positioned to
+// land exactly where .input's own text starts: its border-width
+// (2.5rem) plus its mixin's own padding-left (0.5em).
+.placeholder {
+    position: absolute;
+    left: calc(2.5rem + 0.5em);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1em;
+    color: var(--textColorDim);
+    pointer-events: none;
 }

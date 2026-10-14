@@ -43,6 +43,10 @@ here lives in `DECISIONS.md`
   or `index.css`, or the UI-devtools-mode `localhost:9444`) before
   trusting a reference mod's claim - two confirmed real, one confirmed
   wrong for our use case (see Phase 7 below).
+- A plain `<input placeholder="...">`'s native `placeholder` attribute
+  doesn't render in Coherent Gameface - confirmed in-game 2026-10-13,
+  shows as a blank box instead. Use `shared/TextInput.tsx`'s overlaid
+  `<span>` approach for any new text input, not the raw attribute.
 
 ## Decisions (locked 2026-10-09)
 

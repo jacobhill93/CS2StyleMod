@@ -1,9 +1,7 @@
 import { Button } from "cs2/ui";
-import classNames from "classnames";
 import { FilterDropdown } from "shared/FilterDropdown";
+import { TextInput } from "shared/TextInput";
 import { useBuildingFilters } from "shared/useBuildingFilters";
-import { TextInputTheme } from "vanilla/TextInputTheme";
-import inputStyles from "shared/TextInput.module.scss";
 import styles from "shared/BuildingFilterBar.module.scss";
 
 // The render half of useBuildingFilters - split out so both the Phase 4
@@ -14,12 +12,7 @@ import styles from "shared/BuildingFilterBar.module.scss";
 // on a second row below it.
 export const BuildingFilterBar = (filters: ReturnType<typeof useBuildingFilters>) => (
     <div className={styles.wrapper}>
-        <input
-            value={filters.nameFilter}
-            onChange={(event) => filters.setNameFilter(event.target.value)}
-            placeholder="Search name"
-            className={classNames(TextInputTheme.input, inputStyles.input, styles.searchInput)}
-        />
+        <TextInput value={filters.nameFilter} onChange={filters.setNameFilter} placeholder="Search name" className={styles.searchInput} />
         <div className={styles.filterRow}>
             <FilterDropdown label="Any zone" options={filters.zoneTypes} value={filters.zoneTypeFilter} onChange={filters.setZoneTypeFilter} />
             <FilterDropdown label="Any level" options={filters.levels} value={filters.levelFilter} onChange={filters.setLevelFilter} formatOption={(v) => `L${v}`} />

@@ -8,8 +8,7 @@ import { Icons } from "shared/icons";
 import rowStyles from "shared/ListRow.module.scss";
 import { BuildingThumbnail } from "shared/BuildingThumbnail";
 import styles from "./CollectionsTab.module.scss";
-import inputStyles from "shared/TextInput.module.scss";
-import { TextInputTheme } from "vanilla/TextInputTheme";
+import { TextInput } from "shared/TextInput";
 import { RenameableTitle } from "shared/RenameableTitle";
 import { CollectionEntry } from "shared/CollectionEntry";
 
@@ -173,14 +172,14 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
             </Scrollable>
             <div className={rowStyles.createRowWrapper}>
                 <div className={rowStyles.createRowGroup}>
-                    <input
+                    <TextInput
                         value={newName}
-                        onChange={(event) => {
-                            setNewName(event.target.value);
+                        onChange={(value) => {
+                            setNewName(value);
                             if (nameError) setNameError(false);
                         }}
                         placeholder="New collection name"
-                        className={classNames(TextInputTheme.input, inputStyles.input, rowStyles.createRowInput)}
+                        className={rowStyles.createRowInput}
                     />
                     <Button onSelect={onCreate}>Create</Button>
                 </div>
