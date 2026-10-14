@@ -8,6 +8,8 @@ import { BuildingFilterBar } from "shared/BuildingFilterBar";
 import rowStyles from "shared/ListRow.module.scss";
 import { BuildingThumbnail } from "shared/BuildingThumbnail";
 import { useVirtualizedRows } from "shared/useVirtualizedRows";
+import { CollectionEntry } from "shared/CollectionEntry";
+import tabStyles from "./AssetsTab.module.scss";
 
 // Must match the real rendered row height: ListRow.module.scss's .row
 // padding (8px top + 8px bottom = base.$space-md each) plus
@@ -15,13 +17,6 @@ import { useVirtualizedRows } from "shared/useVirtualizedRows";
 // measured - see useVirtualizedRows.ts's own comment for why.
 const ROW_HEIGHT = 64;
 const LIST_VIEWPORT_HEIGHT = 340;
-
-interface CollectionEntry {
-    id: string;
-    name: string;
-    entryCount: number;
-    prefabIds: string[];
-}
 
 const Buildings$ = bindValue<BuildingEntry[]>(mod.id, "Buildings", []);
 const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
@@ -75,16 +70,14 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
     return (
         <>
             {pickingForCollectionId && (
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                <div className={rowStyles.detailHeader}>
                     <Button onSelect={onDonePicking}>Done</Button>
-                    <span style={{ fontSize: "14px", fontWeight: "bold", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        Adding to "{pickingCollection?.name ?? ""}"
-                    </span>
+                    <span className={rowStyles.detailTitle}>Adding to "{pickingCollection?.name ?? ""}"</span>
                 </div>
             )}
             <BuildingFilterBar {...filters} />
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px" }}>
-                <span style={{ fontSize: "13px", opacity: 0.8 }}>
+            <div className={tabStyles.countRow}>
+                <span className={tabStyles.countText}>
                     {filtered.length}/{buildings.length} shown
                 </span>
                 {pickingForCollectionId && (
@@ -96,7 +89,7 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
             </div>
             <Scrollable vertical ref={scrollRef} onScroll={onScroll} style={{ height: `${LIST_VIEWPORT_HEIGHT}px` }}>
                 {filtered.length === 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
+                    <div className={tabStyles.emptyStateWithAction}>
                         <span className={rowStyles.emptyState}>No buildings match. Try a different search or filter.</span>
                         <Button onSelect={filters.clearFilters}>Clear filters</Button>
                     </div>

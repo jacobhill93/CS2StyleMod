@@ -1,0 +1,20 @@
+@use "base";
+
+// UI_UPGRADE_GUIDE.md Phase 2 - layout only; the input's own look comes
+// from TextInputTheme.input + TextInput.module.scss, composed alongside
+// these classes at the call site, not duplicated here.
+.wrapper {
+    margin-bottom: base.$space-md;
+}
+
+.searchInput {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 6px;
+}
+
+.filterRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}

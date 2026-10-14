@@ -11,6 +11,7 @@ import styles from "./CollectionsTab.module.scss";
 import inputStyles from "shared/TextInput.module.scss";
 import { TextInputTheme } from "vanilla/TextInputTheme";
 import { RenameableTitle } from "shared/RenameableTitle";
+import { CollectionEntry } from "shared/CollectionEntry";
 
 interface BuildingEntry {
     prefabId: string;
@@ -21,13 +22,6 @@ interface BuildingEntry {
     heightMeters: number;
     assetPackIds: string[];
     iconPath: string;
-}
-
-interface CollectionEntry {
-    id: string;
-    name: string;
-    entryCount: number;
-    prefabIds: string[];
 }
 
 const Collections$ = bindValue<CollectionEntry[]>(mod.id, "Collections", []);
@@ -143,15 +137,14 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                 {collections.map((collection) => (
                     <div
                         key={collection.id}
-                        className={confirmingDeleteId === collection.id ? undefined : rowStyles.row}
-                        style={confirmingDeleteId === collection.id ? { display: "flex", flexDirection: "column", gap: "4px", padding: "4px 0" } : undefined}
+                        className={confirmingDeleteId === collection.id ? rowStyles.confirmRow : rowStyles.row}
                     >
                         {confirmingDeleteId === collection.id ? (
                             <>
-                                <span style={{ fontSize: "13px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
+                                <span className={rowStyles.confirmText}>
                                     Delete "{collection.name}"? It'll be detached from any zones using it.
                                 </span>
-                                <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
+                                <div className={rowStyles.confirmActions}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
                                     <Button
                                         variant="icon"
@@ -178,8 +171,8 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                     </div>
                 ))}
             </Scrollable>
-            <div style={{ display: "flex", flexDirection: "column", marginTop: "8px", gap: "4px" }}>
-                <div style={{ display: "flex", gap: "4px" }}>
+            <div className={rowStyles.createRowWrapper}>
+                <div className={rowStyles.createRowGroup}>
                     <input
                         value={newName}
                         onChange={(event) => {
@@ -187,12 +180,11 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                             if (nameError) setNameError(false);
                         }}
                         placeholder="New collection name"
-                        className={classNames(TextInputTheme.input, inputStyles.input)}
-                        style={{ flex: 1 }}
+                        className={classNames(TextInputTheme.input, inputStyles.input, rowStyles.createRowInput)}
                     />
                     <Button onSelect={onCreate}>Create</Button>
                 </div>
-                {nameError && <span style={{ fontSize: "12px", color: "#ff8080" }}>Name required.</span>}
+                {nameError && <span className={rowStyles.errorText}>Name required.</span>}
             </div>
         </>
     );
@@ -211,7 +203,7 @@ const CollectionDetail = ({ collection, buildings, onBack, onAddAssets }: Collec
 
     return (
         <>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+            <div className={rowStyles.detailHeader}>
                 <Button onSelect={onBack}>Back</Button>
                 <RenameableTitle
                     name={collection.name}
@@ -259,7 +251,7 @@ const CollectionLevel1WarningBanner = ({ collectionId }: { collectionId: string 
                 "{warning.collectionName}" has no Level 1 building for: {warning.missingZoneTypes.join(", ")} - it
                 won't spawn anything fresh on an empty lot for those zone types.
             </span>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div className={rowStyles.confirmActions}>
                 <Button onSelect={() => trigger(mod.id, "DismissCollectionLevel1Warning")}>OK</Button>
             </div>
         </div>

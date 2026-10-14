@@ -11,12 +11,7 @@ import styles from "./ZonesTab.module.scss";
 import inputStyles from "shared/TextInput.module.scss";
 import { TextInputTheme } from "vanilla/TextInputTheme";
 import { RenameableTitle } from "shared/RenameableTitle";
-
-interface CollectionEntry {
-    id: string;
-    name: string;
-    entryCount: number;
-}
+import { CollectionEntry } from "shared/CollectionEntry";
 
 interface ZoneEntry {
     id: string;
@@ -160,15 +155,14 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                 {zones.map((zone) => (
                     <div
                         key={zone.id}
-                        className={confirmingDeleteId === zone.id ? undefined : rowStyles.row}
-                        style={confirmingDeleteId === zone.id ? { display: "flex", flexDirection: "column", gap: "4px", padding: "4px 0" } : undefined}
+                        className={confirmingDeleteId === zone.id ? rowStyles.confirmRow : rowStyles.row}
                     >
                         {confirmingDeleteId === zone.id ? (
                             <>
-                                <span style={{ fontSize: "13px", width: "100%", whiteSpace: "normal", wordBreak: "break-word" }}>
+                                <span className={rowStyles.confirmText}>
                                     Delete "{zone.name}"? Its collections remain available for other zones.
                                 </span>
-                                <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
+                                <div className={rowStyles.confirmActions}>
                                     <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
                                     <Button
                                         variant="icon"
@@ -195,8 +189,8 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                     </div>
                 ))}
             </Scrollable>
-            <div style={{ display: "flex", flexDirection: "column", marginTop: "8px", gap: "4px" }}>
-                <div style={{ display: "flex", gap: "4px" }}>
+            <div className={rowStyles.createRowWrapper}>
+                <div className={rowStyles.createRowGroup}>
                     <input
                         value={newName}
                         onChange={(event) => {
@@ -204,8 +198,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                             if (createError) setCreateError(false);
                         }}
                         placeholder="New zone name"
-                        className={classNames(TextInputTheme.input, inputStyles.input)}
-                        style={{ flex: 1 }}
+                        className={classNames(TextInputTheme.input, inputStyles.input, rowStyles.createRowInput)}
                     />
                     <FilterDropdown
                         label="Base type"
@@ -229,7 +222,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                     ))}
                     <Button onSelect={onCreate}>Create</Button>
                 </div>
-                {createError && <span style={{ fontSize: "12px", color: "#ff8080" }}>Name and base type are both required.</span>}
+                {createError && <span className={rowStyles.errorText}>Name and base type are both required.</span>}
             </div>
         </>
     );
@@ -265,7 +258,7 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
 
     return (
         <>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+            <div className={rowStyles.detailHeader}>
                 <Button onSelect={onBack}>Back</Button>
                 <RenameableTitle
                     name={zone.name}
@@ -293,8 +286,8 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                     </div>
                 ))}
             </Scrollable>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px" }}>
-                <div style={{ display: "flex", gap: "4px" }}>
+            <div className={rowStyles.createRowWrapperWide}>
+                <div className={rowStyles.createRowGroup}>
                     <FilterDropdown
                         label="Add existing collection"
                         options={unattached.map((c) => c.id)}
@@ -312,13 +305,12 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                         Add
                     </Button>
                 </div>
-                <div style={{ display: "flex", gap: "4px" }}>
+                <div className={rowStyles.createRowGroup}>
                     <input
                         value={newCollectionName}
                         onChange={(event) => setNewCollectionName(event.target.value)}
                         placeholder="New collection name"
-                        className={classNames(TextInputTheme.input, inputStyles.input)}
-                        style={{ flex: 1 }}
+                        className={classNames(TextInputTheme.input, inputStyles.input, rowStyles.createRowInput)}
                     />
                     <Button onSelect={onCreateAndAttach}>Create Collection and Add to Zone</Button>
                 </div>

@@ -60,3 +60,95 @@
     color: var(--textColorDim);
     padding: base.$space-md base.$space-sm;
 }
+
+// UI_UPGRADE_GUIDE.md Phase 2 - the rest of this file was per-row chrome
+// only; these are the cross-tab layout/chrome patterns Zones/Collections/
+// Assets had each separately hand-copied as inline style objects
+// (confirmed identical by direct comparison, not assumed), consolidated
+// here alongside the row classes they're always used next to.
+
+// A list row's stacked delete-confirmation state - structurally
+// different from .row on purpose (confirmed in Phase 6's own notes:
+// these intentionally don't get .row's styling), so a separate class,
+// not a .row modifier.
+.confirmRow {
+    display: flex;
+    flex-direction: column;
+    gap: base.$space-sm;
+    padding: base.$space-sm 0;
+}
+
+.confirmText {
+    font-size: 13px;
+    width: 100%;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.confirmActions {
+    display: flex;
+    gap: base.$space-sm;
+    justify-content: flex-end;
+}
+
+// A detail view's "Back" button + title row (Zones/Collections detail
+// headers, the Assets tab's "Adding to X" picking-mode header).
+.detailHeader {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: base.$space-md;
+}
+
+// The title text itself - shared by RenameableTitle's non-editing state
+// and AssetsTab's picking-mode header, both previously identical,
+// separately-declared inline styles.
+.detailTitle {
+    flex: 1;
+    font-size: 14px;
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+// The "New X name" create-row's outer wrapper and its inner input+button
+// line.
+.createRowWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: base.$space-sm;
+    margin-top: base.$space-md;
+}
+
+// Same as .createRowWrapper but gap: 6px, not 4px - ZonesTab's
+// ZoneDetail "add existing / create and attach" block was already
+// written with this different gap before this consolidation pass;
+// preserved as its own class rather than silently normalized to 4px,
+// since that would be a real (if tiny) visual change, not a pure
+// refactor. Worth asking whether this was ever intentional - see
+// FINDINGS.
+.createRowWrapperWide {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: base.$space-md;
+}
+
+.createRowGroup {
+    display: flex;
+    gap: base.$space-sm;
+}
+
+.createRowInput {
+    flex: 1;
+}
+
+// Was color: #ff8080 (×2, Zones/Collections create-row validation text) -
+// replaced with the game's own negative/error token, confirmed real by
+// grepping the installed game's compiled CSS (--negativeColor:#e95f4a),
+// not invented.
+.errorText {
+    font-size: 12px;
+    color: var(--negativeColor);
+}

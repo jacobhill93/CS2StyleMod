@@ -1,0 +1,27 @@
+@use "../../../shared/base" as base;
+
+// UI_UPGRADE_GUIDE.md Phase 2 - classes specific to this tab only;
+// cross-tab chrome (the picking-mode header) lives in
+// shared/ListRow.module.scss instead.
+
+.countRow {
+    display: flex;
+    align-items: center;
+    gap: base.$space-sm;
+    margin-bottom: base.$space-md;
+}
+
+// Was opacity: 0.8 on the row's own text - replaced with the game's own
+// dimmed-text variable (already used identically by ListRow.module.scss's
+// .secondary/.emptyState), not an invented value.
+.countText {
+    font-size: 13px;
+    color: var(--textColorDim);
+}
+
+.emptyStateWithAction {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}

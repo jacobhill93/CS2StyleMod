@@ -2,6 +2,7 @@ import { Button } from "cs2/ui";
 import { useEffect, useRef, useState } from "react";
 import { Icons } from "shared/icons";
 import { EllipsisTextInput } from "vanilla/EllipsisTextInput";
+import rowStyles from "shared/ListRow.module.scss";
 
 interface RenameableTitleProps {
     name: string;
@@ -74,18 +75,7 @@ export const RenameableTitle = ({ name, onRename }: RenameableTitleProps) => {
 
     return (
         <>
-            <span
-                style={{
-                    flex: 1,
-                    fontSize: "14px",
-                    fontWeight: "bold",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                }}
-            >
-                {name}
-            </span>
+            <span className={rowStyles.detailTitle}>{name}</span>
             <Button variant="icon" src={Icons.pencil} tooltipLabel="Rename" onSelect={startEditing} />
         </>
     );
