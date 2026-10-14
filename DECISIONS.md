@@ -2,6 +2,93 @@
 
 ## Decisions
 
+### Assets-tab tile grid built, isolated, confirmed in-game, now the default (2026-10-13)
+`UI_UPGRADE_GUIDE.md` Phase 4c - the one item on Phase 4's menu that's a
+real redesign, not a retrofit: an opt-in grid view for the Assets tab,
+using `assetGridTheme` (`item`/`row`/`thumbnail`) the way Phase 7.3
+should have - on actual square tiles, not full-width rows. The user
+explicitly asked up front whether this could be cleanly reverted if it
+doesn't pan out, given how much higher-risk this item is than the rest
+of Phase 4's menu.
+
+**Built deliberately isolated**, same discipline as
+`PlatterCompatibility.cs`: 3 new files
+(`UI/src/vanilla/AssetGridTheme.ts`, `AssetsTileGrid.tsx`,
+`AssetsTileGrid.module.scss`) plus a `viewMode` toggle in `AssetsTab.tsx`
+that's the *only* thing touching the existing, working row-list code
+path - that path is completely untouched and still available via the
+toggle. Reverting (if it had not worked out) would have been exactly
+"delete those 3 files and the toggle."
+
+**Real engineering decisions made along the way:**
+- `classes.itemGrid` deliberately not used - it sizes itself from
+  `--assetMenuColumns` (9, tuned for vanilla's full-width asset menu),
+  assumed too wide for this mod's fixed 840px shell. Sizing instead
+  comes from hand-synced constants, corrected through several rounds of
+  real in-game screenshots rather than guessed once and shipped:
+  - `TILES_PER_ROW`: started at 6 (on the "9 is too wide" assumption) -
+    screenshot showed the right third of the panel empty, since
+    `classes.row` has no justify-content stretch rule and just
+    left-packs tiles. Tried 9 (vanilla's own count) as the implied fix;
+    user judged that too wide without needing a rebuild to check;
+    settled on 8, confirmed via screenshot to exactly fill the width.
+    Then, per a later user request to enlarge the tiles and give the
+    label more room, corrected again to 7, with the tile itself scaled
+    up by `TILE_SCALE = 8/7` to keep filling the same width.
+  - `TILE_ROW_HEIGHT_PX` (vertical spacing): 100 too small (rows
+    crowded/overlapped) -> 140 confirmed clean -> scaling naively by
+    `TILE_SCALE` to 160 overshot (too much gap) -> 130 confirmed too
+    little -> settled on 150.
+  - `TILE_LABEL_SPACE_PX` (room inside the tile for the label): 22 left
+    almost no slack versus the label's own content height, so the
+    label sat crammed against the tile's edge instead of having visible
+    padding - bumped to 34.
+- The label moved from outside/below the tile (floating in the dark
+  panel background) to inside the tile (sharing the grey backdrop, via
+  a `width`/`height`/`flexDirection: column` inline-style override on
+  the vanilla `.item_a5m` div - inline wins over the class's own fixed
+  square sizing), per user request, and is rendered *above* the
+  thumbnail, not below - also per explicit user request after the
+  "text is at the bottom" feedback turned out to mean an ordering
+  preference, not a padding bug.
+- The label element is a `<div>`, not a `<span>` - a `<span>` is inline
+  by default, and its `width: 100%`/`text-align: center` weren't
+  reliably applying in Coherent Gameface (confirmed in-game: no
+  ellipsis truncation, text not centered). A `<div>` is block-level by
+  default, giving it a real constrained box; switching fixed both.
+- `classes.row`'s own `.row_xSL+.row_xSL { margin-top:
+  var(--assetMenuItemGap) }` rule is explicitly neutralized
+  (`marginTop: 0`) on each row, since this mod's own absolute-position
+  virtualization math already fully accounts for vertical spacing via
+  `TILE_ROW_HEIGHT_PX` - letting both apply would double the gap. The
+  horizontal `margin-left` rule between tiles in the same row is kept,
+  since nothing else computes that.
+- The tile container is a plain `<div>`, not `cs2/ui`'s `Button` -
+  every existing `Button variant="icon"` usage in this codebase passes
+  an `src` icon prop, never arbitrary children, and `Button`'s internal
+  structure is unproven against being resized to a vanilla tile class.
+  A plain div also matches `.item_a5m`'s own actual DOM shape (confirmed
+  from its CSS, not guessed) and still gets real `:hover`/`:active`
+  states from that class's CSS regardless of not being a `Button`.
+- The "selected" class applied to an already-added building's tile is a
+  plain, unhashed literal name (not part of `AssetGridTheme`'s exported
+  classes object) inferred from the compiled CSS's own selectors
+  (`.item_a5m.selected`) - a reasonable inference, not confirmed against
+  whatever vanilla component normally applies it. Still unconfirmed.
+- `BuildingThumbnail.tsx` gained an optional `size` prop (inline style,
+  not a second className) so this tile grid can use vanilla's own
+  `~68rem` thumbnail sizing instead of the component's normal fixed
+  48px - inline rather than class-based specifically because two
+  different SCSS modules' same-specificity classes would have an
+  unpredictable cascade order between them, where an inline style wins
+  unambiguously instead.
+
+After all of the above was confirmed clean in-game (correct width fill,
+no row overlap, ellipsis/centering working, label positioned as wanted),
+the user preferred grid over the row list, so `viewMode` now defaults to
+`"grid"` - `"list"` stays available via the toggle, and the row-list
+code path remains untouched.
+
 ### EllipsisTextInput's Escape key can't be made to cancel - accepted as-is (2026-10-13)
 `UI_UPGRADE_GUIDE.md` Phase 3b swapped the rename fields (`shared/
 RenameableTitle.tsx`) from Phase 3a's plain `<input>` to the real

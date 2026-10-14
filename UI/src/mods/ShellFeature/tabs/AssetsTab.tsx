@@ -1,6 +1,6 @@
 import { bindValue, trigger, useValue } from "cs2/api";
 import { Button, Scrollable } from "cs2/ui";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import mod from "../../../../mod.json";
 import { Icons } from "shared/icons";
 import { BuildingEntry, useBuildingFilters } from "shared/useBuildingFilters";
@@ -9,6 +9,7 @@ import rowStyles from "shared/ListRow.module.scss";
 import { BuildingThumbnail } from "shared/BuildingThumbnail";
 import { useVirtualizedRows } from "shared/useVirtualizedRows";
 import { CollectionEntry } from "shared/CollectionEntry";
+import { AssetsTileGrid } from "./AssetsTileGrid";
 import tabStyles from "./AssetsTab.module.scss";
 
 // Must match the real rendered row height: ListRow.module.scss's .row
@@ -35,11 +36,19 @@ interface AssetsTabProps {
     onDonePicking?: () => void;
 }
 
+// UI_UPGRADE_GUIDE.md Phase 4c - grid confirmed in-game (2026-10-13,
+// after several rounds of spacing/label fixes) and preferred over the
+// row list, so it's now the default; "list" stays available via the
+// toggle for anyone who wants it, and the row-list code path itself
+// is still completely untouched by this toggle existing.
+type ViewMode = "list" | "grid";
+
 export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabProps) => {
     const buildings = useValue(Buildings$);
     const collections = useValue(Collections$);
     const filters = useBuildingFilters(buildings);
     const { filtered } = filters;
+    const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
     const pickingCollection = pickingForCollectionId
         ? collections.find((c) => c.id === pickingForCollectionId)
@@ -86,15 +95,26 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
                         <Button onSelect={onUnselectAllFiltered}>Unselect All</Button>
                     </>
                 )}
+                <Button variant="flat" selected={viewMode === "grid"} onSelect={() => setViewMode(viewMode === "list" ? "grid" : "list")}>
+                    {viewMode === "list" ? "Grid view" : "List view"}
+                </Button>
             </div>
-            <Scrollable vertical ref={scrollRef} onScroll={onScroll} style={{ height: `${LIST_VIEWPORT_HEIGHT}px` }}>
-                {filtered.length === 0 && (
-                    <div className={tabStyles.emptyStateWithAction}>
-                        <span className={rowStyles.emptyState}>No buildings match. Try a different search or filter.</span>
-                        <Button onSelect={filters.clearFilters}>Clear filters</Button>
-                    </div>
-                )}
-                {filtered.length > 0 && (
+            {filtered.length === 0 && (
+                <div className={tabStyles.emptyStateWithAction}>
+                    <span className={rowStyles.emptyState}>No buildings match. Try a different search or filter.</span>
+                    <Button onSelect={filters.clearFilters}>Clear filters</Button>
+                </div>
+            )}
+            {filtered.length > 0 && viewMode === "grid" && (
+                <AssetsTileGrid
+                    buildings={filtered}
+                    viewportHeight={LIST_VIEWPORT_HEIGHT}
+                    pickingForCollectionId={pickingForCollectionId}
+                    memberPrefabIds={memberPrefabIds}
+                />
+            )}
+            {filtered.length > 0 && viewMode === "list" && (
+                <Scrollable vertical ref={scrollRef} onScroll={onScroll} style={{ height: `${LIST_VIEWPORT_HEIGHT}px` }}>
                     <div style={{ position: "relative", height: `${totalHeight}px` }}>
                         {visibleRows.map((building, i) => {
                             const alreadyAdded = memberPrefabIds.has(building.prefabId);
@@ -126,8 +146,8 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
                             );
                         })}
                     </div>
-                )}
-            </Scrollable>
+                </Scrollable>
+            )}
         </>
     );
 };

@@ -1,0 +1,22 @@
+// UI_UPGRADE_GUIDE.md Phase 4c - name label stacked above the
+// thumbnail, inside the vanilla assetGridTheme.item tile (see
+// AssetsTileGrid.tsx's width/height/flexDirection override on that
+// div) so the grey tile backdrop covers both and reads as one card -
+// an earlier version kept the label outside/below the tile in the
+// dark panel background, then below-but-inside the tile; user asked
+// for it moved above the thumbnail (2026-10-13).
+// Explicit width (matching the tile's own TILE_WIDTH_CSS, not an
+// ambiguous 100%) - without it this label has no real width to
+// constrain against, so a long asset name (confirmed in-game: China
+// pack names specifically) just grows outward past the tile instead
+// of truncating.
+.tileLabel {
+    margin-bottom: 4px;
+    width: 100%;
+    font-size: 12px;
+    color: var(--textColorDim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+}
