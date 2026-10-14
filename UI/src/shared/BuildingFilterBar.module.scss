@@ -1,0 +1,18 @@
+@use "base";
+
+.bar {
+    margin-bottom: 8rem;
+}
+
+.dropdowns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6rem;
+}
+
+.clear {
+    @include base.transparentButton;
+    font-size: 13rem;
+    color: var(--textColorDim);
+}

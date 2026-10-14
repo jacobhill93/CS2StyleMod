@@ -68,7 +68,7 @@ export const ShellFeature = () => {
                         <Button
                             key={tab.id}
                             variant="flat"
-                            className={classNames(styles.tabButton, activeTab === tab.id && styles.tabButtonSelected)}
+                            className={classNames(styles.tab, activeTab === tab.id && styles.tabSelected)}
                             selected={activeTab === tab.id}
                             onSelect={() => switchTab(tab.id)}
                         >

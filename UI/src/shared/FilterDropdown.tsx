@@ -1,6 +1,8 @@
 import * as cs2ui from "cs2/ui";
 import { Dropdown, DropdownToggle } from "cs2/ui";
 import { ReactNode } from "react";
+import classNames from "classnames";
+import styles from "./FilterDropdown.module.scss";
 
 // cs2/ui's own ambient type declarations (UI/types/ui.d.ts) declare both a
 // plain data interface `DropdownItem<T>` (item shape) and re-export the
@@ -52,7 +54,9 @@ export const FilterDropdown = ({ label, options, value, onChange, formatOption }
                 </>
             }
         >
-            <DropdownToggle>{value === ANY ? label : format(value)}</DropdownToggle>
+            <DropdownToggle className={classNames(styles.toggle, value !== ANY && styles.toggleActive)}>
+                {value === ANY ? label : format(value)}
+            </DropdownToggle>
         </Dropdown>
     );
 };

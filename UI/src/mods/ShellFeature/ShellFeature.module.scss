@@ -61,35 +61,35 @@
     color: var(--accentColorNormal);
 }
 
+// Underlined tab strip (accent underline matches .header's border)
+// instead of cs2/ui's default filled pill buttons. Button stays
+// variant="flat" so the game doesn't paint its own fill underneath.
 .tabs {
     display: flex;
-    gap: base.$space-sm;
+    background-color: var(--panelColorDark);
     margin-bottom: base.$space-md;
-    padding: base.$space-sm base.$space-md 0;
 }
 
-// Custom selected/hover treatment layered on top of cs2/ui's own Button,
-// not an attempt to override its internal selected-state styling (its
-// real implementation isn't visible to us, just its type declarations) -
-// same technique Road Builder's real shipped SidePanel.module.scss uses
-// for its own mode-toggle buttons (confirmed via direct source read):
-// a plain conditional className driven by our own React state, with
-// !important since it's layered over the library's own rules, not
-// replacing them.
-.tabButton {
-    @include base.interactive-transition(background-color);
+.tab {
+    @include base.transparentButton;
+    border-radius: 0;
+    padding: 10rem 18rem;
+    font-size: 14rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: var(--textColorDim);
+    border-bottom: 3rem solid transparent;
 
     &:hover {
-        background-color: rgba(255, 255, 255, 0.12) !important;
+        color: var(--menuText1Normal);
+        background-color: rgba(255, 255, 255, 0.06);
     }
 }
 
-.tabButtonSelected {
-    background-color: var(--accentColorDark) !important;
-
-    &:hover {
-        background-color: var(--accentColorDark) !important;
-    }
+.tabSelected {
+    color: var(--menuText1Normal);
+    border-bottom-color: var(--accentColorNormal);
+    background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 // Phase 6: dropped the blanket opacity:0.8 this had in Phase 1 - that

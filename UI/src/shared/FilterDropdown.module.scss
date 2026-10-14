@@ -1,0 +1,17 @@
+@use "base";
+
+// Dark translucent toggle (Road Builder styles its dropdown toggle with the
+// same text-input look) instead of cs2/ui's default light-grey menu style.
+.toggle {
+    @include base.textInputBasic;
+    min-width: 120rem;
+    font-size: 13rem;
+}
+
+// A non-"Any" filter gets an accent border so applied filters are visible
+// at a glance. !important since it's layered over the game's own toggle rules.
+.toggleActive {
+    border-color: var(--accentColorNormal) !important;
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    color: var(--menuText1Normal);
+}

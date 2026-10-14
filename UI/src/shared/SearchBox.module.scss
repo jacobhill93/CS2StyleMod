@@ -1,0 +1,40 @@
+@use "base";
+
+.searchBox {
+    position: relative;
+    margin-bottom: 6rem;
+}
+
+.input {
+    @include base.textInputBasic;
+    width: 100%;
+}
+
+.placeholder {
+    position: absolute;
+    left: 12rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14rem;
+    pointer-events: none;
+}
+
+.clear {
+    position: absolute;
+    right: 6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22rem;
+    height: 22rem;
+    padding: 0;
+    background: none;
+
+    img {
+        width: 14rem;
+        height: 14rem;
+        background-color: var(--menuText1Normal);
+        mask-size: contain;
+        mask-position: 50% 50%;
+    }
+}

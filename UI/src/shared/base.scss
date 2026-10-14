@@ -15,3 +15,84 @@ $space-xl: 16px;
 @mixin interactive-transition($properties: background-color, $duration: 0.15s) {
     transition: $properties $duration ease;
 }
+
+// --- Button/input mixins ----------------------------------------------------
+// Adapted from Road Builder (MIT License, Copyright (c) 2024 JadHajjar):
+// https://github.com/JadHajjar/RoadBuilder-CSII/blob/master/RoadBuilder/UI/src/mods/base.scss
+// Sizes are in rem (the game scales rem with resolution; 1rem ~ 1px at 1080p).
+
+@mixin textInputBasic {
+    background-color: rgba(0, 0, 0, 0.15);
+    color: #eee;
+    padding: 4rem 8rem;
+    font-size: 14rem;
+    border: 2.5rem solid rgba(255, 255, 255, 0.2);
+    border-radius: 5rem;
+    transition: background-color 0.15s, border-color 0.15s;
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    &:focus,
+    &.active {
+        background-color: rgba(255, 255, 255, 0.2);
+        border-color: var(--accentColorLight);
+    }
+}
+
+@mixin baseButton {
+    pointer-events: auto;
+    padding: 6rem 10rem;
+    border-radius: 4rem;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--menuText1Normal);
+    transition: background-color 0.15s, color 0.15s;
+
+    img {
+        width: 20rem;
+        height: 20rem;
+        background-color: var(--menuText1Normal);
+        mask-size: contain;
+        mask-position: 50% 50%;
+    }
+
+    &[disabled],
+    &.disabled {
+        pointer-events: none !important;
+        color: var(--normalTextColorLocked) !important;
+
+        img {
+            background-color: var(--normalTextColorLocked) !important;
+        }
+    }
+}
+
+@mixin lightButton {
+    @include baseButton;
+    background-color: rgba(255, 255, 255, 0.1);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.35);
+    }
+
+    &:active {
+        background-color: var(--accentColorDark-focused) !important;
+    }
+}
+
+@mixin transparentButton {
+    @include baseButton;
+    background-color: transparent;
+
+    &:hover {
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    &:active {
+        background-color: var(--accentColorDark-focused) !important;
+    }
+}
