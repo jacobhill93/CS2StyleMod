@@ -9,6 +9,7 @@ import rowStyles from "shared/ListRow.module.scss";
 import { BuildingThumbnail } from "shared/BuildingThumbnail";
 import styles from "./CollectionsTab.module.scss";
 import { TextInput } from "shared/TextInput";
+import { TextButton } from "shared/TextButton";
 import { RenameableTitle } from "shared/RenameableTitle";
 import { CollectionEntry } from "shared/CollectionEntry";
 
@@ -144,7 +145,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                                     Delete "{collection.name}"? It'll be detached from any zones using it.
                                 </span>
                                 <div className={rowStyles.confirmActions}>
-                                    <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
+                                    <TextButton onSelect={() => setConfirmingDeleteId(null)}>Cancel</TextButton>
                                     <Button
                                         variant="icon"
                                         src={Icons.trash}
@@ -181,7 +182,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                         placeholder="New collection name"
                         className={rowStyles.createRowInput}
                     />
-                    <Button onSelect={onCreate}>Create</Button>
+                    <TextButton onSelect={onCreate}>Create</TextButton>
                 </div>
                 {nameError && <span className={rowStyles.errorText}>Name required.</span>}
             </div>
@@ -203,7 +204,7 @@ const CollectionDetail = ({ collection, buildings, onBack, onAddAssets }: Collec
     return (
         <>
             <div className={rowStyles.detailHeader}>
-                <Button onSelect={onBack}>Back</Button>
+                <TextButton onSelect={onBack}>Back</TextButton>
                 <RenameableTitle
                     name={collection.name}
                     onRename={(newName) => trigger(mod.id, "RenameCollection", collection.id, newName)}
@@ -231,7 +232,7 @@ const CollectionDetail = ({ collection, buildings, onBack, onAddAssets }: Collec
                 ))}
             </Scrollable>
             <div style={{ marginTop: "8px" }}>
-                <Button onSelect={onAddAssets}>+ Add Assets</Button>
+                <TextButton onSelect={onAddAssets}>+ Add Assets</TextButton>
             </div>
         </>
     );
@@ -251,7 +252,7 @@ const CollectionLevel1WarningBanner = ({ collectionId }: { collectionId: string 
                 won't spawn anything fresh on an empty lot for those zone types.
             </span>
             <div className={rowStyles.confirmActions}>
-                <Button onSelect={() => trigger(mod.id, "DismissCollectionLevel1Warning")}>OK</Button>
+                <TextButton onSelect={() => trigger(mod.id, "DismissCollectionLevel1Warning")}>OK</TextButton>
             </div>
         </div>
     );

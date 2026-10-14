@@ -1,0 +1,9 @@
+@use "base";
+
+.button {
+    @include base.flatButtonChrome;
+}
+
+.selected {
+    @include base.flatButtonSelected;
+}

@@ -16,6 +16,44 @@ $space-xl: 16px;
     transition: $properties $duration ease;
 }
 
+// Hand-styled override layered on top of cs2/ui's own Button, same
+// technique as ShellFeature.module.scss's own .tabButton predates this
+// with (a plain className, !important since it's layered over the
+// library's own rules, not an attempt to replace its internal
+// implementation, which isn't visible to us). cs2/ui's default Button
+// renders as a fully-rounded pill, which looked out of place next to
+// the rest of this mod's flatter, darker panel chrome (user feedback,
+// 2026-10-13). Pure visual CSS, no hidden vanilla behavior at stake
+// (unlike e.g. EllipsisTextInput or AssetGridTheme elsewhere in this
+// codebase) - tried hand-styled first and corrected via in-game
+// screenshots, not verified against the real game CSS up front. See
+// DECISIONS.md for why that's fine here but wasn't for those.
+@mixin flatButtonChrome {
+    border-radius: 4rem !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    // cs2/ui's own Button padding wasn't enough once the pill shape was
+    // gone - text sat flush against the flattened edges (user feedback,
+    // 2026-10-13).
+    padding: 4rem 12rem !important;
+    @include interactive-transition(background-color);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.16) !important;
+    }
+
+    &:active {
+        background-color: var(--accentColorDark) !important;
+    }
+}
+
+@mixin flatButtonSelected {
+    background-color: var(--accentColorDark) !important;
+
+    &:hover {
+        background-color: var(--accentColorDark) !important;
+    }
+}
+
 // --- Road Builder-derived mixins (UI_OVERHAUL_PLAN.md Phase 7) ---
 // Copied from RoadBuilder's own src/mods/base.scss, under the MIT License
 // - see THIRD_PARTY_NOTICES.md for the full notice. Deliberately kept in

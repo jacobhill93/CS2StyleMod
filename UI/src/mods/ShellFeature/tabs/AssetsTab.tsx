@@ -9,6 +9,7 @@ import rowStyles from "shared/ListRow.module.scss";
 import { BuildingThumbnail } from "shared/BuildingThumbnail";
 import { useVirtualizedRows } from "shared/useVirtualizedRows";
 import { CollectionEntry } from "shared/CollectionEntry";
+import { TextButton } from "shared/TextButton";
 import { AssetsTileGrid } from "./AssetsTileGrid";
 import tabStyles from "./AssetsTab.module.scss";
 
@@ -80,29 +81,35 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
         <>
             {pickingForCollectionId && (
                 <div className={rowStyles.detailHeader}>
-                    <Button onSelect={onDonePicking}>Done</Button>
+                    <TextButton onSelect={onDonePicking}>Done</TextButton>
                     <span className={rowStyles.detailTitle}>Adding to "{pickingCollection?.name ?? ""}"</span>
                 </div>
             )}
             <BuildingFilterBar {...filters} />
             <div className={tabStyles.countRow}>
+                {/* Explicit {" "} rather than a plain space before "shown" -
+                plain inter-expression whitespace here was rendering with no
+                visible gap in-game (2026-10-13), a Gameface text-layout
+                quirk, not a real JSX whitespace-trimming bug (this line's
+                space isn't at a line boundary, so standard JSX rules keep
+                it). */}
                 <span className={tabStyles.countText}>
-                    {filtered.length}/{buildings.length} shown
+                    {filtered.length}/{buildings.length}{" "}shown
                 </span>
                 {pickingForCollectionId && (
                     <>
-                        <Button onSelect={onSelectAllFiltered}>Select All</Button>
-                        <Button onSelect={onUnselectAllFiltered}>Unselect All</Button>
+                        <TextButton onSelect={onSelectAllFiltered}>Select All</TextButton>
+                        <TextButton onSelect={onUnselectAllFiltered}>Unselect All</TextButton>
                     </>
                 )}
-                <Button variant="flat" selected={viewMode === "grid"} onSelect={() => setViewMode(viewMode === "list" ? "grid" : "list")}>
+                <TextButton selected={viewMode === "grid"} onSelect={() => setViewMode(viewMode === "list" ? "grid" : "list")}>
                     {viewMode === "list" ? "Grid view" : "List view"}
-                </Button>
+                </TextButton>
             </div>
             {filtered.length === 0 && (
                 <div className={tabStyles.emptyStateWithAction}>
                     <span className={rowStyles.emptyState}>No buildings match. Try a different search or filter.</span>
-                    <Button onSelect={filters.clearFilters}>Clear filters</Button>
+                    <TextButton onSelect={filters.clearFilters}>Clear filters</TextButton>
                 </div>
             )}
             {filtered.length > 0 && viewMode === "grid" && (

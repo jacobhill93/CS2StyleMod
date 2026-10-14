@@ -78,6 +78,12 @@
 // !important since it's layered over the library's own rules, not
 // replacing them.
 .tabButton {
+    // Flattened to match the rest of the mod's buttons (shared/TextButton)
+    // - cs2/ui's default pill radius looked out of place, and its own
+    // padding wasn't enough once that shape was gone - text sat flush
+    // against the flattened edges (user feedback, 2026-10-13).
+    border-radius: 4rem !important;
+    padding: 4rem 14rem !important;
     @include base.interactive-transition(background-color);
 
     &:hover {

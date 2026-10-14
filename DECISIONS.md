@@ -2,6 +2,61 @@
 
 ## Decisions
 
+### Flattened cs2/ui's default pill-shaped Button, hand-styled not vanilla-verified (2026-10-13)
+User feedback after the tile grid landed: `cs2/ui`'s default `Button`
+(fully-rounded pill) and the stock `FilterDropdown`/search-box chrome
+looked out of place next to this mod's own flatter, darker panel -
+"vanilla" in the sense of matching the library's defaults, but not in
+the sense of matching the rest of the game's own UI.
+
+A cloud Claude session had independently pushed a branch
+(`claude/ui-button-filter-polish`) attacking the same problem with
+hand-rolled CSS mimicking vanilla's look rather than reusing real
+vanilla classes - checked out and diffed against `main`, found real
+conflicts (it duplicated a `textInputBasic` mixin we'd already copied
+from Road Builder, with different values) and one genuinely useful,
+independently-verified claim: Coherent Gameface silently ignores the
+native `placeholder` attribute. Not merged - not merge-clean, and its
+`SearchBox` replaced our already-working, already-verified
+`TextInputTheme`-based input with an unproven hand-rolled one - but the
+placeholder claim was verified true in-game and fixed separately (see
+`shared/TextInput.tsx`).
+
+For the buttons/filters themselves: **decided to hand-style rather than
+verify-against-vanilla-first**, unlike every other vanilla-adjacent
+decision this session. The reasoning: the "grep the real CSS first"
+discipline earns its cost when vanilla gives you *working behavior*
+worth not reimplementing (`EllipsisTextInput`'s focus handling,
+`AssetGridTheme`'s tile DOM shape) - there's real risk of getting
+subtle behavior wrong by guessing. Button/dropdown chrome is pure
+visual CSS with no hidden behavior at stake; hand-styling and
+correcting via real in-game screenshots (same loop that worked for the
+tile grid) is both faster and lower-risk here.
+
+**Built**: `base.scss` gained `flatButtonChrome`/`flatButtonSelected`
+mixins (flattened radius, transparent/hover/active background, explicit
+padding - `cs2/ui`'s own padding wasn't enough once the pill shape was
+gone, text sat flush against the edges, confirmed in-game and
+corrected) - layered over `cs2/ui`'s `Button` the same way
+`ShellFeature.module.scss`'s pre-existing `.tabButton` already does
+(plain className, `!important`, not an attempt to override `Button`'s
+actual internal implementation, which isn't visible to us). A new
+`shared/TextButton.tsx` wraps every plain-text `Button` usage (~14
+call sites across `AssetsTab`/`CollectionsTab`/`ZonesTab`/
+`BuildingFilterBar`) in one place rather than a className added
+separately at each one, since the exact look was still being dialed in
+screenshot-by-screenshot. `ShellFeature.module.scss`'s own `.tabButton`
+got the same radius/padding treatment directly (not routed through the
+new shared mixin via composition, just the same values) for a
+consistent look across tabs and action buttons. Icon-variant `Button`
+usages (`variant="icon"`) are untouched - not part of the complaint,
+already an established-working pattern.
+
+Confirmed in-game (radius, then padding after a follow-up "text is
+smushed against the edges" report) - not yet revisited for the actual
+`FilterDropdown` menu/toggle styling, which was the other half of the
+original complaint ("gray boxes with white search results").
+
 ### Assets-tab tile grid built, isolated, confirmed in-game, now the default (2026-10-13)
 `UI_UPGRADE_GUIDE.md` Phase 4c - the one item on Phase 4's menu that's a
 real redesign, not a retrofit: an opt-in grid view for the Assets tab,

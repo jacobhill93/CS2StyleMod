@@ -1,6 +1,6 @@
-import { Button } from "cs2/ui";
 import { FilterDropdown } from "shared/FilterDropdown";
 import { TextInput } from "shared/TextInput";
+import { TextButton } from "shared/TextButton";
 import { useBuildingFilters } from "shared/useBuildingFilters";
 import styles from "shared/BuildingFilterBar.module.scss";
 
@@ -19,7 +19,7 @@ export const BuildingFilterBar = (filters: ReturnType<typeof useBuildingFilters>
             <FilterDropdown label="Any width" options={filters.lotWidths} value={filters.lotWidthFilter} onChange={filters.setLotWidthFilter} formatOption={(v) => `${v} wide`} />
             <FilterDropdown label="Any depth" options={filters.lotDepths} value={filters.lotDepthFilter} onChange={filters.setLotDepthFilter} formatOption={(v) => `${v} deep`} />
             <FilterDropdown label="Any pack" options={filters.assetPacks} value={filters.assetPackFilter} onChange={filters.setAssetPackFilter} />
-            <Button onSelect={filters.clearFilters}>Clear</Button>
+            <TextButton onSelect={filters.clearFilters}>Clear</TextButton>
         </div>
     </div>
 );

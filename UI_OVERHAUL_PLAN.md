@@ -47,6 +47,11 @@ here lives in `DECISIONS.md`
   doesn't render in Coherent Gameface - confirmed in-game 2026-10-13,
   shows as a blank box instead. Use `shared/TextInput.tsx`'s overlaid
   `<span>` approach for any new text input, not the raw attribute.
+- A plain space between a JSX expression and adjacent text (e.g.
+  `{count} shown`) can render with no visible gap in Gameface, even
+  though it's not a real JSX whitespace-trimming bug (not at a line
+  boundary - a real browser renders it fine) - confirmed in-game
+  2026-10-13. Force it with an explicit `{" "}` text node instead.
 
 ## Decisions (locked 2026-10-09)
 

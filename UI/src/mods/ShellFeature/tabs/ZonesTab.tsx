@@ -9,6 +9,7 @@ import { Icons } from "shared/icons";
 import rowStyles from "shared/ListRow.module.scss";
 import styles from "./ZonesTab.module.scss";
 import { TextInput } from "shared/TextInput";
+import { TextButton } from "shared/TextButton";
 import { RenameableTitle } from "shared/RenameableTitle";
 import { CollectionEntry } from "shared/CollectionEntry";
 
@@ -162,7 +163,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                                     Delete "{zone.name}"? Its collections remain available for other zones.
                                 </span>
                                 <div className={rowStyles.confirmActions}>
-                                    <Button onSelect={() => setConfirmingDeleteId(null)}>Cancel</Button>
+                                    <TextButton onSelect={() => setConfirmingDeleteId(null)}>Cancel</TextButton>
                                     <Button
                                         variant="icon"
                                         src={Icons.trash}
@@ -209,17 +210,16 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                         }}
                     />
                     {(Object.keys(REGION_LABELS) as ZoneRegion[]).map((region) => (
-                        <Button
+                        <TextButton
                             key={region}
-                            variant="flat"
                             selected={newRegion === region}
                             tooltipLabel={region === "NorthAmerica" ? "North America theme" : "Europe theme"}
                             onSelect={() => setNewRegion(region)}
                         >
                             {REGION_LABELS[region]}
-                        </Button>
+                        </TextButton>
                     ))}
-                    <Button onSelect={onCreate}>Create</Button>
+                    <TextButton onSelect={onCreate}>Create</TextButton>
                 </div>
                 {createError && <span className={rowStyles.errorText}>Name and base type are both required.</span>}
             </div>
@@ -258,7 +258,7 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
     return (
         <>
             <div className={rowStyles.detailHeader}>
-                <Button onSelect={onBack}>Back</Button>
+                <TextButton onSelect={onBack}>Back</TextButton>
                 <RenameableTitle
                     name={zone.name}
                     onRename={(newName) => trigger(mod.id, "RenameZone", zone.id, newName)}
@@ -294,7 +294,7 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                         onChange={setAddTargetId}
                         formatOption={(id) => collectionNameById.get(id) ?? id}
                     />
-                    <Button
+                    <TextButton
                         disabled={addTargetId === ANY}
                         onSelect={() => {
                             trigger(mod.id, "AddCollectionToZone", zone.id, addTargetId);
@@ -302,7 +302,7 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                         }}
                     >
                         Add
-                    </Button>
+                    </TextButton>
                 </div>
                 <div className={rowStyles.createRowGroup}>
                     <TextInput
@@ -311,7 +311,7 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                         placeholder="New collection name"
                         className={rowStyles.createRowInput}
                     />
-                    <Button onSelect={onCreateAndAttach}>Create Collection and Add to Zone</Button>
+                    <TextButton onSelect={onCreateAndAttach}>Create Collection and Add to Zone</TextButton>
                 </div>
             </div>
         </>
