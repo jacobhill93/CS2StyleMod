@@ -207,7 +207,9 @@ namespace ZoneBuilder.UI
             }
             catch (Exception ex)
             {
-                Mod.log.Error(ex, $"Failed to {action} zone '{definition.Id}' (\"{definition.Name}\") - change was not saved.");
+                var message = $"Failed to {action} zone '{definition.Id}' (\"{definition.Name}\") - change was not saved.";
+                Mod.log.Error(ex, message);
+                UIErrorState.Report(message);
                 return false;
             }
         }
@@ -221,7 +223,9 @@ namespace ZoneBuilder.UI
             }
             catch (Exception ex)
             {
-                Mod.log.Error(ex, $"Failed to delete zone '{id}' - it may still be present on disk.");
+                var message = $"Failed to delete zone '{id}' - it may still be present on disk.";
+                Mod.log.Error(ex, message);
+                UIErrorState.Report(message);
                 return false;
             }
         }

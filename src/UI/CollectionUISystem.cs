@@ -73,6 +73,13 @@ namespace ZoneBuilder.UI
             // collections actually get built in practice.
             CreateTrigger<string>("FinishEditingCollectionAssets", OnFinishEditingCollectionAssets);
             CreateTrigger("DismissCollectionLevel1Warning", OnDismissCollectionLevel1Warning);
+
+            // Phase 5 (UI_UPGRADE_GUIDE.md) - minimal failure surfacing.
+            // UIErrorState is shared with ZoneUISystem (see its own
+            // comment) - exposed here, not there, simply because this
+            // system was registered first; either would have worked.
+            CreateBinding<UIErrorEntry>("UIError", () => UIErrorState.Current);
+            CreateTrigger("DismissUIError", UIErrorState.Dismiss);
         }
 
         private void OnCreateCollection(string id, string name)
@@ -219,7 +226,9 @@ namespace ZoneBuilder.UI
             }
             catch (Exception ex)
             {
-                Mod.log.Error(ex, $"Failed to {action} collection '{collection.Id}' (\"{collection.Name}\") - change was not saved.");
+                var message = $"Failed to {action} collection '{collection.Id}' (\"{collection.Name}\") - change was not saved.";
+                Mod.log.Error(ex, message);
+                UIErrorState.Report(message);
                 return false;
             }
         }
@@ -233,7 +242,9 @@ namespace ZoneBuilder.UI
             }
             catch (Exception ex)
             {
-                Mod.log.Error(ex, $"Failed to delete collection '{id}' - it may still be present on disk.");
+                var message = $"Failed to delete collection '{id}' - it may still be present on disk.";
+                Mod.log.Error(ex, message);
+                UIErrorState.Report(message);
                 return false;
             }
         }

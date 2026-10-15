@@ -62,6 +62,39 @@
     color: var(--accentColorNormal);
 }
 
+// Phase 5 (UI_UPGRADE_GUIDE.md) - minimal failure surfacing. Same shape
+// as CollectionsTab.module.scss's level1WarningBanner/level1WarningText
+// (padding/gap/border-radius/font-size), but with verified game tokens
+// instead of that one's raw hsla() literals (no verified replacement
+// was ever found for those during Phase 2 - left as a FINDINGS note,
+// not fixed here - this is a new banner, not a retrofit of that one).
+// --negativeColor is already used the same way for ListRow.module.scss's
+// .errorText; --panelColorDark already used by .header above.
+.errorBanner {
+    display: flex;
+    flex-direction: column;
+    gap: base.$space-sm;
+    padding: base.$space-md base.$space-lg;
+    margin: base.$space-md base.$space-md 0;
+    background-color: var(--panelColorDark);
+    border-style: solid;
+    border-width: 1px;
+    border-color: var(--negativeColor);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.errorBannerText {
+    color: var(--negativeColor);
+    white-space: normal;
+    word-break: break-word;
+}
+
+.errorBannerActions {
+    display: flex;
+    justify-content: flex-end;
+}
+
 .tabs {
     display: flex;
     gap: base.$space-sm;

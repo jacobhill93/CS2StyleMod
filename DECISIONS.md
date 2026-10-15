@@ -2,6 +2,57 @@
 
 ## Decisions
 
+### Phase 5 - minimal failure surfacing, shared error state + explicit dismiss (2026-10-14)
+`UI_UPGRADE_GUIDE.md` Phase 5: a failed `CollectionUISystem`/`ZoneUISystem`
+save or delete (disk full, file locked, permissions denied) previously
+only reached `Mod.log.Error` - the player saw nothing happen and had no
+way to know their create/rename/delete/attach/detach didn't actually
+take. Scope matched the guide's own prediction exactly: the `TrySave`/
+`TryDelete` catch blocks (6 call sites each in `CollectionUISystem.cs`/
+`ZoneUISystem.cs`) are real I/O failures worth surfacing; every other
+early-return in those files (failed `Guid.TryParse`, blank-name
+validation, a stale id no longer in the library, the idempotent
+duplicate-add skip) is a defensive guard against an impossible-from-the-
+UI or already-benign state, not a failure - left log-only/silent on
+purpose, not an oversight.
+
+Two decisions the guide explicitly flagged as the user's to make, not
+mine:
+- **Ownership**: `CollectionUISystem` and `ZoneUISystem` are registered
+  as separate systems (`Mod.cs`), so either could own its own getter
+  binding (two independent banners) or share one. Went with a shared
+  static holder (`src/UI/UIErrorState.cs`) that both systems' `TrySave`/
+  `TryDelete` write to, with only `CollectionUISystem` exposing it as
+  the `UIError` binding/`DismissUIError` trigger the shell actually
+  renders - simpler than reconciling two banners that could in
+  principle both be active, for an edge case this rare.
+- **Dismissal**: explicit OK button, not self-clear-on-next-success -
+  matches the already-shipped `CollectionLevel1Warning` banner's own
+  pattern exactly (same component shape, same dismiss-trigger idea),
+  and avoids the banner flashing away unread if the player's very next
+  action happens to succeed.
+
+**Built**: `UIErrorEntry {active, message}` (mirrors
+`CollectionLevel1WarningEntry`'s shape), one banner in `ShellFeature.tsx`
+above the tab bar, styled in `ShellFeature.module.scss` by cloning
+`CollectionsTab.module.scss`'s `level1WarningBanner`/`level1WarningText`
+shape - but with verified tokens (`--negativeColor`, already used for
+`ListRow.module.scss`'s `.errorText`; `--panelColorDark`, already used
+by `.header`) instead of that banner's own raw `hsla()` literals (no
+verified replacement was ever found for those during Phase 2 - a
+FINDINGS note, not something this phase fixes). The message shown is
+the exact same string already passed to `Mod.log.Error`, built once and
+reused for both, so the UI and the log can never diverge.
+
+Full build succeeds, 54 Core tests pass, deployed. **Not yet confirmed
+in-game**: normal create/rename/delete/attach/detach flows showing no
+banner should be trivially true (nothing changed about the success
+path), but the actual failure path itself is unverified - exercising a
+real `TrySave`/`TryDelete` catch block needs an actual I/O failure
+(e.g. making a collection/zone file briefly read-only), which hasn't
+been tried. If that's impractical, this stays "code-complete, failure
+path unverified in-game" rather than claimed working.
+
 ### Flattened cs2/ui's default pill-shaped Button, hand-styled not vanilla-verified (2026-10-13)
 User feedback after the tile grid landed: `cs2/ui`'s default `Button`
 (fully-rounded pill) and the stock `FilterDropdown`/search-box chrome

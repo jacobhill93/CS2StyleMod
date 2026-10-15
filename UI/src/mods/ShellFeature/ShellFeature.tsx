@@ -1,14 +1,27 @@
-import { trigger, useValue } from "cs2/api";
+import { bindValue, trigger, useValue } from "cs2/api";
 import { Button, Panel } from "cs2/ui";
 import { useState } from "react";
 import classNames from "classnames";
 import mod from "../../../mod.json";
 import { fpsMeterLevel$ } from "shared/fpsMeter";
 import { closeShell, shellVisible$ } from "shared/shellVisibility";
+import { TextButton } from "shared/TextButton";
 import { ZonesTab } from "./tabs/ZonesTab";
 import { CollectionsTab } from "./tabs/CollectionsTab";
 import { AssetsTab } from "./tabs/AssetsTab";
 import styles from "./ShellFeature.module.scss";
+
+// Phase 5 (UI_UPGRADE_GUIDE.md) - minimal failure surfacing. Mirrors
+// CollectionUIEntry/CollectionLevel1WarningEntry (src/UI/UIErrorState.cs)
+// exactly - a failed CollectionUISystem/ZoneUISystem save or delete
+// (disk full, file locked, permissions denied - previously logged only,
+// invisible to the player) now reaches this one binding instead.
+interface UIErrorEntry {
+    active: boolean;
+    message: string;
+}
+
+const UIError$ = bindValue<UIErrorEntry>(mod.id, "UIError", { active: false, message: "" });
 
 type ShellTab = "zones" | "collections" | "assets";
 
@@ -26,6 +39,7 @@ const TABS: { id: ShellTab; label: string }[] = [
 // in-game (see "What NOT to do" in the plan).
 export const ShellFeature = () => {
     const fpsMeterLevel = useValue(fpsMeterLevel$);
+    const uiError = useValue(UIError$);
     const [activeTab, setActiveTab] = useState<ShellTab>("zones");
     // Which collection the Assets tab is currently picking for, if any -
     // owned here (not by CollectionsTab/AssetsTab) since switching into
@@ -70,6 +84,14 @@ export const ShellFeature = () => {
     return (
         <div className={classNames(styles.shell, styles[`fpsLevel${fpsMeterLevel}`])}>
             <Panel header={<div className={styles.header}>ZoneBuilder</div>} onClose={closeShell}>
+                {uiError.active && (
+                    <div className={styles.errorBanner}>
+                        <span className={styles.errorBannerText}>{uiError.message}</span>
+                        <div className={styles.errorBannerActions}>
+                            <TextButton onSelect={() => trigger(mod.id, "DismissUIError")}>OK</TextButton>
+                        </div>
+                    </div>
+                )}
                 <div className={styles.tabs}>
                     {TABS.map((tab) => (
                         <Button
