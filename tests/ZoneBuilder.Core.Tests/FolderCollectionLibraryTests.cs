@@ -205,6 +205,31 @@ namespace ZoneBuilder.Core.Tests
         }
 
         [Fact]
+        public void AFileWithNoSchemaVersionIsIsolatedAndReportedRatherThanSilentlyTrustedAsCurrent()
+        {
+            // No "SchemaVersion" property at all reads as version 0 (see
+            // SchemaMigrationTests) - with no migration registered from
+            // 0 yet, this must fail loudly and be isolated the same way
+            // a malformed file already is, not get deserialized as if it
+            // were already CollectionFileFormat.CurrentSchemaVersion.
+            Directory.CreateDirectory(m_FolderPath);
+            File.WriteAllText(Path.Combine(m_FolderPath, "pre-versioning.json"), @"
+                { ""Collections"": [
+                    { ""Id"": """ + Guid.NewGuid() + @""", ""Name"": ""No version"", ""Entries"": [] }
+                ] }");
+
+            var good = new Collection("Good");
+            new FolderCollectionLibrary(m_FolderPath).Save(good);
+
+            var library = new FolderCollectionLibrary(m_FolderPath);
+
+            Assert.Equal("Good", Assert.Single(library.GetAll()).Name);
+            var failure = Assert.Single(library.LoadFailures);
+            Assert.Contains("pre-versioning.json", failure.FilePath);
+            Assert.Contains("schema version 0", failure.Error.Message);
+        }
+
+        [Fact]
         public void ATolerantlyLoadedMultiCollectionFileLoadsAllOfThem()
         {
             // Not something this library ever writes itself (always one

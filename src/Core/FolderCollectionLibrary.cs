@@ -137,7 +137,7 @@ namespace ZoneBuilder.Core
                 try
                 {
                     var json = File.ReadAllText(filePath);
-                    var dto = JsonConvert.DeserializeObject<CollectionFileFormat.LibraryFileDto>(json);
+                    var dto = CollectionFileFormat.ParseLibraryFile(json);
 
                     foreach (var collectionDto in dto?.Collections ?? Enumerable.Empty<CollectionFileFormat.CollectionDto>())
                     {

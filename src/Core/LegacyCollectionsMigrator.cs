@@ -72,7 +72,7 @@ namespace ZoneBuilder.Core
             try
             {
                 var json = File.ReadAllText(legacyFilePath);
-                dto = JsonConvert.DeserializeObject<CollectionFileFormat.LibraryFileDto>(json);
+                dto = CollectionFileFormat.ParseLibraryFile(json);
             }
             catch (Exception ex)
             {

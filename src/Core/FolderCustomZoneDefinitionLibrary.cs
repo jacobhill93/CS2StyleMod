@@ -107,7 +107,7 @@ namespace ZoneBuilder.Core
                 try
                 {
                     var json = File.ReadAllText(filePath);
-                    var dto = JsonConvert.DeserializeObject<CustomZoneDefinitionFileFormat.LibraryFileDto>(json);
+                    var dto = CustomZoneDefinitionFileFormat.ParseLibraryFile(json);
 
                     foreach (var definitionDto in dto?.Definitions ?? Enumerable.Empty<CustomZoneDefinitionFileFormat.CustomZoneDefinitionDto>())
                     {

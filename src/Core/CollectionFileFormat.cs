@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace ZoneBuilder.Core
 {
@@ -19,6 +20,26 @@ namespace ZoneBuilder.Core
     internal static class CollectionFileFormat
     {
         public const int CurrentSchemaVersion = 1;
+
+        // No real schema change has ever happened to this format yet -
+        // empty on purpose. Add a step here (SchemaMigrationStep(1, ...))
+        // the next time CurrentSchemaVersion is bumped, rather than
+        // trying to express the change as a change to CollectionDto/
+        // EntryDto directly - see SchemaMigration.cs for why.
+        private static readonly IReadOnlyList<SchemaMigrationStep> Migrations = Array.Empty<SchemaMigrationStep>();
+
+        // The one place every load path (FolderCollectionLibrary,
+        // LegacyCollectionsMigrator, CollectionImporter) should parse a
+        // collections file from - runs it through SchemaMigration first,
+        // so a file written by an older mod version is transformed
+        // before DeserializeObject ever sees it, rather than each call
+        // site deserializing directly and hoping the current DTO shape
+        // happens to still match.
+        public static LibraryFileDto ParseLibraryFile(string json)
+        {
+            json = SchemaMigration.Migrate(json, CurrentSchemaVersion, Migrations);
+            return JsonConvert.DeserializeObject<LibraryFileDto>(json);
+        }
 
         public sealed class LibraryFileDto
         {

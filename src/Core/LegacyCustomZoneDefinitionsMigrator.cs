@@ -54,7 +54,7 @@ namespace ZoneBuilder.Core
             try
             {
                 var json = File.ReadAllText(legacyFilePath);
-                dto = JsonConvert.DeserializeObject<CustomZoneDefinitionFileFormat.LibraryFileDto>(json);
+                dto = CustomZoneDefinitionFileFormat.ParseLibraryFile(json);
             }
             catch (Exception ex)
             {

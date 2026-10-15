@@ -1,16 +1,32 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace ZoneBuilder.Core
 {
     // The JSON shape shared by FolderCustomZoneDefinitionLibrary's own
     // files and LegacyCustomZoneDefinitionsMigrator - same split as
     // CollectionFileFormat/FolderCollectionLibrary, for the same reason
-    // (see DECISIONS.md "Migrated to one file per collection").
+    // (see ARCHITECTURE.md).
     internal static class CustomZoneDefinitionFileFormat
     {
         public const int CurrentSchemaVersion = 1;
+
+        // No real schema change has ever happened to this format yet -
+        // empty on purpose. See CollectionFileFormat.Migrations for the
+        // pattern to follow the next time CurrentSchemaVersion is bumped.
+        private static readonly IReadOnlyList<SchemaMigrationStep> Migrations = Array.Empty<SchemaMigrationStep>();
+
+        // The one place every load path (FolderCustomZoneDefinitionLibrary,
+        // LegacyCustomZoneDefinitionsMigrator) should parse a zone
+        // definitions file from - see CollectionFileFormat.ParseLibraryFile
+        // for why.
+        public static LibraryFileDto ParseLibraryFile(string json)
+        {
+            json = SchemaMigration.Migrate(json, CurrentSchemaVersion, Migrations);
+            return JsonConvert.DeserializeObject<LibraryFileDto>(json);
+        }
 
         public sealed class LibraryFileDto
         {
