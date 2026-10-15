@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ANY } from "shared/FilterDropdown";
+import { sortZoneTypes } from "shared/zoneTypeLabels";
 
 export interface BuildingEntry {
     prefabId: string;
@@ -29,7 +30,7 @@ export function useBuildingFilters(buildings: BuildingEntry[]) {
     const [lotDepthFilter, setLotDepthFilter] = useState(ANY);
     const [assetPackFilter, setAssetPackFilter] = useState(ANY);
 
-    const zoneTypes = useMemo(() => distinctStrings(buildings.map((b) => b.zoneType)), [buildings]);
+    const zoneTypes = useMemo(() => sortZoneTypes(distinctStrings(buildings.map((b) => b.zoneType))), [buildings]);
     const levels = useMemo(() => distinctNumbers(buildings.map((b) => b.level)).map(String), [buildings]);
     const lotWidths = useMemo(() => distinctNumbers(buildings.map((b) => b.lotWidth)).map(String), [buildings]);
     const lotDepths = useMemo(() => distinctNumbers(buildings.map((b) => b.lotDepth)).map(String), [buildings]);

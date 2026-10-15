@@ -355,7 +355,7 @@ namespace ZoneBuilder.CustomZones.GameAdapters
         // exact AreaType/IsOffice/density switch): maps a live ZoneData +
         // ZonePropertiesData back to Core's own ZoneType enum. Returns
         // false for anything that doesn't correspond to one of Core's
-        // seven categories (e.g. AreaType.None).
+        // categories (e.g. AreaType.None).
         // internal, not private - GameZonePrefabResolver reuses this exact
         // mapping to resolve a vanilla ZonePrefab by Core.ZoneType category
         // (the inverse direction), rather than duplicating the switch.
@@ -403,8 +403,22 @@ namespace ZoneBuilder.CustomZones.GameAdapters
                 case AreaType.Commercial:
                     zoneType = CoreZoneType.CommercialHigh;
                     return true;
+                // GetZoneDensity handles Industrial (which Office buildings
+                // are a flavor of, per IsOffice()) same as it handles
+                // Commercial - confirmed real via actual building names
+                // (`OfficeLow01_L1_3x4`, see DECISIONS.md). This used to
+                // collapse every Office building into one undifferentiated
+                // CoreZoneType.Office regardless of density - fixed
+                // 2026-10-13 (user feedback: the Assets-tab zone filter
+                // never had separate Office Low/High options). Mirrors the
+                // Commercial case's own Low-explicit/High-fallthrough shape
+                // exactly, since Office has the same two density tiers, not
+                // Residential's three.
+                case AreaType.Industrial when isOffice && density == ZoneDensity.Low:
+                    zoneType = CoreZoneType.OfficeLow;
+                    return true;
                 case AreaType.Industrial when isOffice:
-                    zoneType = CoreZoneType.Office;
+                    zoneType = CoreZoneType.OfficeHigh;
                     return true;
                 case AreaType.Industrial:
                     zoneType = CoreZoneType.Industrial;

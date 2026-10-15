@@ -2,6 +2,7 @@ import { FilterDropdown } from "shared/FilterDropdown";
 import { TextInput } from "shared/TextInput";
 import { TextButton } from "shared/TextButton";
 import { useBuildingFilters } from "shared/useBuildingFilters";
+import { formatZoneType } from "shared/zoneTypeLabels";
 import styles from "shared/BuildingFilterBar.module.scss";
 
 // The render half of useBuildingFilters - split out so both the Phase 4
@@ -12,9 +13,9 @@ import styles from "shared/BuildingFilterBar.module.scss";
 // on a second row below it.
 export const BuildingFilterBar = (filters: ReturnType<typeof useBuildingFilters>) => (
     <div className={styles.wrapper}>
-        <TextInput value={filters.nameFilter} onChange={filters.setNameFilter} placeholder="Search name" className={styles.searchInput} />
+        <TextInput value={filters.nameFilter} onChange={filters.setNameFilter} placeholder="Search name" className={styles.searchInput} fontSize="1.5em" />
         <div className={styles.filterRow}>
-            <FilterDropdown label="Any zone" options={filters.zoneTypes} value={filters.zoneTypeFilter} onChange={filters.setZoneTypeFilter} />
+            <FilterDropdown label="Any zone" options={filters.zoneTypes} value={filters.zoneTypeFilter} onChange={filters.setZoneTypeFilter} formatOption={formatZoneType} />
             <FilterDropdown label="Any level" options={filters.levels} value={filters.levelFilter} onChange={filters.setLevelFilter} formatOption={(v) => `L${v}`} />
             <FilterDropdown label="Any width" options={filters.lotWidths} value={filters.lotWidthFilter} onChange={filters.setLotWidthFilter} formatOption={(v) => `${v} wide`} />
             <FilterDropdown label="Any depth" options={filters.lotDepths} value={filters.lotDepthFilter} onChange={filters.setLotDepthFilter} formatOption={(v) => `${v} deep`} />
