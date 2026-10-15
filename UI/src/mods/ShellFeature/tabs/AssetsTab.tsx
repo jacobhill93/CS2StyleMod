@@ -102,8 +102,15 @@ export const AssetsTab = ({ pickingForCollectionId, onDonePicking }: AssetsTabPr
                         <TextButton onSelect={onUnselectAllFiltered}>Unselect All</TextButton>
                     </>
                 )}
-                <TextButton selected={viewMode === "grid"} onSelect={() => setViewMode(viewMode === "list" ? "grid" : "list")}>
-                    {viewMode === "list" ? "Grid view" : "List view"}
+                {/* Side-by-side pair, whichever's active highlighted - same
+                pattern as ZonesTab's NA/EU region toggle, swapped in for
+                the single label-swapping button this used to be (user
+                request, 2026-10-14). */}
+                <TextButton selected={viewMode === "grid"} onSelect={() => setViewMode("grid")}>
+                    Grid
+                </TextButton>
+                <TextButton selected={viewMode === "list"} onSelect={() => setViewMode("list")}>
+                    List
                 </TextButton>
             </div>
             {filtered.length === 0 && (

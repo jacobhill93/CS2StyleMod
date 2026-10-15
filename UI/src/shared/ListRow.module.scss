@@ -78,6 +78,27 @@
     padding: base.$space-sm 0;
 }
 
+// Card treatment, composed alongside .row/.confirmRow (adds to, doesn't
+// replace, their layout) - borrows the Assets-tab tile grid's visual
+// language (background-color/border-radius match AssetGridTheme.item's
+// real vanilla values, confirmed in AssetGridTheme.ts), not the vanilla
+// class itself, since that's sized/shaped for a square tile and this is
+// a full-width row. User request, 2026-10-13: "each collection is a
+// very long grid rectangle." Written after .row/.confirmRow in this
+// file so its border-bottom reset/padding win the same-specificity tie
+// against them predictably, without needing !important.
+.cardRow {
+    background-color: rgba(98, 128, 138, 0.4);
+    border-radius: 8rem;
+    padding: base.$space-md;
+    margin-bottom: base.$space-sm;
+    border-bottom: none;
+
+    &:hover {
+        background-color: rgba(98, 128, 138, 0.55);
+    }
+}
+
 .confirmText {
     font-size: 13px;
     width: 100%;

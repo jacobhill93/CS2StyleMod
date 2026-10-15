@@ -1,0 +1,58 @@
+@use "base";
+
+// Hand-styled, same call as shared/TextButton.tsx/base.scss's
+// flatButtonChrome - cs2/ui's default Dropdown rendered as a light/white
+// popup with dark text, clashing hard with this mod's dark panel chrome
+// (user feedback, 2026-10-13: "gray boxes with white search results and
+// ugly text"). First attempt passed a bare partial object to Dropdown's
+// `theme` prop - broke option selection entirely (confirmed in-game):
+// that prop is a plain default parameter inside cs2/ui
+// (`theme: n = <real defaults>`), not a merge, so any partial object
+// REPLACES every key, including ones nothing here even meant to touch
+// (`scrollable`, `dropdownItem`). Fixed via vanilla/DropdownTheme.ts -
+// spread the real defaults, compose (not replace) just `dropdownMenu`
+// with an extra class - see FilterDropdown.tsx. `.popup` below (an
+// inner wrapper around `content`, inside the real popup shell) stayed
+// from that first attempt and still works, but turned out not to be
+// the actual white-box source - `dropdown-menu_rL4` itself (confirmed
+// via live UI devtools inspection, 2026-10-13) has its own solid white
+// background-color peeking out around this inner wrapper. `.menuDark`
+// targets that directly now.
+.toggle {
+    @include base.flatButtonChrome;
+    min-width: 110rem;
+    justify-content: space-between;
+    color: #eee;
+}
+
+.menuDark {
+    background-color: var(--panelColorDark) !important;
+}
+
+.popup {
+    background-color: var(--panelColorDark);
+    padding: 2rem 0;
+}
+
+.item {
+    padding: 4rem 10rem;
+    color: #eee;
+    @include base.interactive-transition(background-color);
+
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+}
+
+// !important: cs2/ui's own default theme has a `.dropdown-item_t3P.selected`
+// rule with a hardcoded blue background - two classes outrank this
+// class's one, so without !important that default wins instead (seen
+// in-game: the active filter option showed bright blue, not this
+// accent color).
+.itemSelected {
+    background-color: var(--accentColorDark) !important;
+
+    &:hover {
+        background-color: var(--accentColorDark) !important;
+    }
+}

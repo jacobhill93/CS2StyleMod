@@ -1,6 +1,15 @@
 import * as cs2ui from "cs2/ui";
 import { Dropdown, DropdownToggle } from "cs2/ui";
 import { ReactNode } from "react";
+import classNames from "classnames";
+import styles from "shared/FilterDropdown.module.scss";
+import { DropdownTheme } from "vanilla/DropdownTheme";
+
+// Spread the real default theme, then compose (not replace) just the one
+// key being changed - see vanilla/DropdownTheme.ts for why a bare partial
+// object here broke option selection entirely. Module-scope, not
+// recomputed per render - DropdownTheme's own classes never change.
+const dropdownTheme = { ...DropdownTheme, dropdownMenu: classNames(DropdownTheme.dropdownMenu, styles.menuDark) };
 
 // cs2/ui's own ambient type declarations (UI/types/ui.d.ts) declare both a
 // plain data interface `DropdownItem<T>` (item shape) and re-export the
@@ -15,6 +24,7 @@ const DropdownItem = cs2ui.DropdownItem as unknown as (props: {
     selected?: boolean;
     onChange?: (value: string) => void;
     children?: ReactNode;
+    className?: string;
 }) => JSX.Element;
 
 // Empty string means "any"/"none selected", shared across every user of
@@ -39,20 +49,24 @@ export interface FilterDropdownProps {
 // zones panel, both need it.
 export const FilterDropdown = ({ label, options, value, onChange, formatOption }: FilterDropdownProps) => {
     const format = formatOption ?? ((v: string) => v);
+    const itemClassName = (selected: boolean) => classNames(styles.item, selected && styles.itemSelected);
     return (
         <Dropdown
+            theme={dropdownTheme}
             content={
-                <>
-                    <DropdownItem value={ANY} selected={value === ANY} onChange={onChange}>{label}</DropdownItem>
+                <div className={styles.popup}>
+                    <DropdownItem value={ANY} selected={value === ANY} onChange={onChange} className={itemClassName(value === ANY)}>
+                        {label}
+                    </DropdownItem>
                     {options.map((option) => (
-                        <DropdownItem key={option} value={option} selected={value === option} onChange={onChange}>
+                        <DropdownItem key={option} value={option} selected={value === option} onChange={onChange} className={itemClassName(value === option)}>
                             {format(option)}
                         </DropdownItem>
                     ))}
-                </>
+                </div>
             }
         >
-            <DropdownToggle>{value === ANY ? label : format(value)}</DropdownToggle>
+            <DropdownToggle className={styles.toggle}>{value === ANY ? label : format(value)}</DropdownToggle>
         </Dropdown>
     );
 };

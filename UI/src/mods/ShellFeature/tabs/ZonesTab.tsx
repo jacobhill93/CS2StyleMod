@@ -12,6 +12,7 @@ import { TextInput } from "shared/TextInput";
 import { TextButton } from "shared/TextButton";
 import { RenameableTitle } from "shared/RenameableTitle";
 import { CollectionEntry } from "shared/CollectionEntry";
+import { formatZoneType, ZONE_TYPE_ORDER } from "shared/zoneTypeLabels";
 
 interface ZoneEntry {
     id: string;
@@ -35,17 +36,14 @@ interface BuildProgressEntry {
     total: number;
 }
 
-// Mirrors Core.ZoneType exactly (src/Core/Primitives.cs) - see ZonePanel's
-// identical list for why this is fixed at creation only.
-const BASE_ZONE_TYPES = [
-    "ResidentialLow",
-    "ResidentialMedium",
-    "ResidentialHigh",
-    "CommercialLow",
-    "CommercialHigh",
-    "Office",
-    "Industrial",
-];
+// The creatable base types - every real Core.ZoneType category except the
+// legacy, density-less "Office" (src/Core/Primitives.cs - kept there only
+// so a zone saved before 2026-10-13's Office Low/High split still
+// deserializes, never offered for new zones). Shared with
+// shared/zoneTypeLabels.ts's sort order rather than a second hand-kept
+// copy, since the two have to stay in sync anyway. Base type is fixed at
+// zone creation only, never changed after.
+const BASE_ZONE_TYPES: string[] = [...ZONE_TYPE_ORDER];
 
 // Mirrors Core.ZoneRegion exactly (src/Core/Primitives.cs) - literal
 // enum member names, not display labels, since this goes straight to
@@ -124,7 +122,7 @@ interface ZonesListProps {
 const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
     const [newName, setNewName] = useState("");
     const [newBaseZoneType, setNewBaseZoneType] = useState(ANY);
-    const [newRegion, setNewRegion] = useState<ZoneRegion>("Europe");
+    const [newRegion, setNewRegion] = useState<ZoneRegion>("NorthAmerica");
     const [createError, setCreateError] = useState(false);
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
@@ -155,7 +153,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                 {zones.map((zone) => (
                     <div
                         key={zone.id}
-                        className={confirmingDeleteId === zone.id ? rowStyles.confirmRow : rowStyles.row}
+                        className={classNames(confirmingDeleteId === zone.id ? rowStyles.confirmRow : rowStyles.row, rowStyles.cardRow)}
                     >
                         {confirmingDeleteId === zone.id ? (
                             <>
@@ -178,7 +176,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                         ) : (
                             <>
                                 <span onClick={() => onSelect(zone.id)} className={classNames(rowStyles.primary, rowStyles.clickable)}>
-                                    {zone.name} ({zone.baseZoneType}, {REGION_LABELS[zone.region as ZoneRegion] ?? zone.region}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
+                                    {zone.name} ({formatZoneType(zone.baseZoneType)}, {REGION_LABELS[zone.region as ZoneRegion] ?? zone.region}, {zone.collectionIds.length} collection{zone.collectionIds.length === 1 ? "" : "s"})
                                 </span>
                                 <div className={rowStyles.actions}>
                                     <Button variant="icon" src={Icons.pencil} tooltipLabel="Edit" onSelect={() => onSelect(zone.id)} />
@@ -199,6 +197,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                         }}
                         placeholder="New zone name"
                         className={rowStyles.createRowInput}
+                        fontSize="1.5em"
                     />
                     <FilterDropdown
                         label="Base type"
@@ -208,6 +207,7 @@ const ZonesList = ({ zones, onSelect }: ZonesListProps) => {
                             setNewBaseZoneType(value);
                             if (createError) setCreateError(false);
                         }}
+                        formatOption={formatZoneType}
                     />
                     {(Object.keys(REGION_LABELS) as ZoneRegion[]).map((region) => (
                         <TextButton
@@ -310,6 +310,7 @@ const ZoneDetail = ({ zone, collections, onBack }: ZoneDetailProps) => {
                         onChange={setNewCollectionName}
                         placeholder="New collection name"
                         className={rowStyles.createRowInput}
+                        fontSize="1.5em"
                     />
                     <TextButton onSelect={onCreateAndAttach}>Create Collection and Add to Zone</TextButton>
                 </div>

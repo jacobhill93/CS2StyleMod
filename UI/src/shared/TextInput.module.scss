@@ -7,14 +7,44 @@
 // (UI/src/vanilla/TextInputTheme.ts) inside that component - this class
 // only supplies the mixin's look, not vanilla's, so both are needed
 // together.
+// display: flex + align-items: center so .input (now a fixed height,
+// see below) sits vertically centered within whatever taller space a
+// flex-stretched wrapper ends up with (e.g. ZonesTab's create-row,
+// next to a taller FilterDropdown/TextButton) - safe because nothing
+// here is a percentage resolving against this wrapper's own size.
 .wrapper {
     position: relative;
+    display: flex;
+    align-items: center;
 }
 
 // width/box-sizing live here, not per call site, so the actual <input>
-// always fills whatever size its wrapper ends up being (the wrapper is
+// always fills whatever width its wrapper ends up being (the wrapper is
 // what call sites size via their own layout class - flex: 1, width:
 // 100%, margin - passed as TextInput's className prop).
+//
+// height: 100% was tried here (2026-10-13, to match a create-row's
+// taller FilterDropdown/TextButton siblings) and reverted immediately -
+// confirmed in-game to blow up every input (and reportedly crashed the
+// game) instead of just filling its own flex-stretched wrapper.
+// Coherent Gameface's flexbox implementation almost certainly doesn't
+// correctly give a stretched flex item a "definite" height the way a
+// real browser does for percentage-height resolution purposes, so
+// height: 100% resolved against something much bigger than intended
+// instead.
+//
+// No explicit height - back to natural sizing (content + em-based
+// padding/line-height from textInputBasic), same as how the Assets-tab
+// search box already worked before any of this. A fixed 32rem was
+// tried here briefly to match ZonesTab's create-row buttons, but every
+// TextInput call site is about to get the search box's own fontSize
+// treatment too (2026-10-14, user request for visual consistency) -
+// stacking a height tuned for the smaller default font on top of that
+// would likely be wrong again. Bigger text naturally wants more line-
+// height/padding anyway (both em-based, scale with fontSize
+// automatically), which may close the create-row height gap on its
+// own - re-measure in-game before reaching for an explicit height
+// again.
 .input {
     @include base.textInputBasic;
     width: 100%;

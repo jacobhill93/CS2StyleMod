@@ -137,7 +137,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                 {collections.map((collection) => (
                     <div
                         key={collection.id}
-                        className={confirmingDeleteId === collection.id ? rowStyles.confirmRow : rowStyles.row}
+                        className={classNames(confirmingDeleteId === collection.id ? rowStyles.confirmRow : rowStyles.row, rowStyles.cardRow)}
                     >
                         {confirmingDeleteId === collection.id ? (
                             <>
@@ -181,6 +181,7 @@ const CollectionsList = ({ collections, onSelect }: CollectionsListProps) => {
                         }}
                         placeholder="New collection name"
                         className={rowStyles.createRowInput}
+                        fontSize="1.5em"
                     />
                     <TextButton onSelect={onCreate}>Create</TextButton>
                 </div>
