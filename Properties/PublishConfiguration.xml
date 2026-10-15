@@ -32,7 +32,7 @@ District Themes: assign a theme (one or more collections) to a district so newly
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog Value="" />
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
-	<ExternalLink Type="github" Url="https://github.com/jacobhill93/CS2StyleMod" />
+	<ExternalLink Type="github" Url="https://github.com/jph093/ZoneBuilder" />
 	<!--Supported values Public, Private, Unlisted-->
 	<AccessLevel Value="Private" />
 </Publish>
