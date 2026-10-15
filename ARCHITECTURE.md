@@ -31,8 +31,8 @@ UI/                       the TypeScript/React frontend - a separate
   src/mods/ShellFeature/  the one registered UI shell - Zones/
                          Collections/Assets tabs
   src/shared/             cross-tab hooks/components
-  src/vanilla/            typed accessors for reused vanilla CSS/
-                         components (getModule), one file per vanilla
+  src/vanilla/            typed accessors for reused base-game CSS/
+                         components (getModule), one file per base-game
                          module actually consumed
 ```
 
@@ -56,9 +56,9 @@ contained to one file.
   `BaseZoneType`, `Region`, and the list of attached Collection GUIDs.
   `BaseZoneType`/`Region` are fixed at creation - the zone's internal
   template name is derived from `Id`, never from these, so changing them
-  later wouldn't actually re-clone a different vanilla template, just
+  later wouldn't actually re-clone a different base-game template, just
   silently change eligibility while keeping the original density.
-- **`Core.ZoneType`** - mirrors the vanilla zone categories:
+- **`Core.ZoneType`** - mirrors the base game's own zone categories:
   `ResidentialLow/Medium/High`, `CommercialLow/High`, `Office`,
   `Industrial`, `OfficeLow`, `OfficeHigh`. `OfficeLow`/`OfficeHigh` are
   appended at the end of the enum rather than placed next to `Office`
@@ -67,7 +67,7 @@ contained to one file.
   silently corrupted any already-saved zone's `BaseZoneType`. Plain
   `Office` is kept, unused by new data, purely so an already-saved zone
   from before the Low/High split still deserializes correctly.
-- **`Core.ZoneRegion`** - `NorthAmerica`/`Europe`. Purely which vanilla
+- **`Core.ZoneRegion`** - `NorthAmerica`/`Europe`. Purely which base-game
   theme/UI grouping a zone's clone displays under - not a different
   simulation profile.
 
@@ -124,15 +124,18 @@ those same two methods, not `JObject`.
 
 ## The zone-building pipeline
 
-A custom zone is a **clone of a vanilla `ZonePrefab`**
-(`PrefabSystem.AddPrefab`/`PrefabBase.Clone` - the same mechanism
-vanilla's own playset system and the editor's "duplicate prefab" tool
-use). Building eligibility needs **no Harmony patches**: vanilla's
+A custom zone starts life as a **clone of one of the base game's own
+`ZonePrefab`s** (`PrefabSystem.AddPrefab`/`PrefabBase.Clone` - the same
+mechanism the game's own playset system and the editor's "duplicate
+prefab" tool use), then becomes its own fully independent zone type -
+distinctly paintable, with its own name, color, and building list, never
+re-merged with or mistaken for the one it was cloned from. Building
+eligibility needs **no Harmony patches**: the base game's own
 `ZoneSpawnSystem` (spawn) and `BuildingUpkeepSystem` (level-up) - both
 Burst-compiled and effectively unpatchable - already filter candidates
 purely by matching a building prefab's `BuildingSpawnGroupData.m_ZoneType`
 against the lot's zone. So cloning the zone and repointing each
-Collection building's zone reference is sufficient; vanilla's own
+Collection building's zone reference is sufficient; the base game's own
 systems do the restricting for free.
 
 ### The one-frame timing constraint
@@ -143,7 +146,7 @@ rather than being inlined wherever a zone needs building.
 
 A runtime-cloned prefab's `Created`/`Updated` tags live for exactly one
 frame. `PrefabSystem.OnUpdate` drives the `PrefabUpdate` phase (which
-every vanilla init system - `ZoneSystem.InitializeZonePrefabs`,
+every base-game init system - `ZoneSystem.InitializeZonePrefabs`,
 `PrefabInitializeSystem`, `ObjectInitializeSystem` - runs under) from a
 fixed point in the game's `MainLoop`. `LoadGameSystem` (which dispatches
 every system's `OnGameLoaded`) is registered in the *same* phase, but
@@ -209,16 +212,16 @@ nothing. Snapshot queries belong in `OnGameLoaded`.)
   (`GameBuildingCatalog`) are similarly index-cached, not linearly
   scanned - a modded playset can have tens of thousands of registered
   prefabs.
-- Demand is shared with vanilla **by design** - demand systems bucket
-  purely by `AreaType`+density, not zone identity, so a custom zone
-  competes in the same demand pool as vanilla rather than running a
-  parallel economy.
+- Demand is shared with the base game **by design** - demand systems
+  bucket purely by `AreaType`+density, not zone identity, so a custom
+  zone competes in the same demand pool as every base-game zone rather
+  than running a parallel economy.
 
 ### Known limitations
 
 - A zone can only spawn buildings fresh on an **empty lot** at Level 1
-  (vanilla's own spawn selection only considers Level 1 for a fresh
-  spawn; level-up only applies to an already-standing building) - a
+  (the base game's own spawn selection only considers Level 1 for a
+  fresh spawn; level-up only applies to an already-standing building) - a
   Collection with no Level 1 entry for a zone type can never bootstrap
   there from scratch.
 - A Collection missing a building for some lot-size/access combination
@@ -268,9 +271,9 @@ consumes bindings from the matching C# system
 Coherent Gameface (the UI engine CS2 embeds) has several real, confirmed
 quirks worth not re-discovering:
 
-- **Mod panels share one render tree with the vanilla HUD, with no error
-  boundary.** An uncaught exception anywhere in a mod's own panel can
-  take down the *entire* game HUD, not just that panel - confirmed three
+- **Mod panels share one render tree with the base game's own HUD, with
+  no error boundary.** An uncaught exception anywhere in a mod's own
+  panel can take down the *entire* game HUD, not just that panel - confirmed three
   separate times in this codebase (a raw HTML `<select>`, a draggable
   `Panel`, and a first attempt at list virtualization each did this).
   `UI.log` (not the mod's own log file) is where the actual stack trace
@@ -309,24 +312,24 @@ quirks worth not re-discovering:
   wiring depended on them. The safe pattern: `getModule` the real
   default theme object (same `vanilla/*.ts` pattern as below), spread
   it, and only override the specific key actually being changed.
-- **Reusing vanilla's own CSS classes/components via `getModule` works,
-  but verify every module path and class against the actually-installed
-  game** - grep `Content/Game/UI/index.js`/`index.css`, or use UI
-  developer mode's `localhost:9444` devtools. A reference mod's claim
+- **Reusing the base game's own CSS classes/components via `getModule`
+  works, but verify every module path and class against the actually-
+  installed game** - grep `Content/Game/UI/index.js`/`index.css`, or use
+  UI developer mode's `localhost:9444` devtools. A reference mod's claim
   about a module path, or a type declaration's shape, is not proof by
-  itself - confirmed wrong at least twice in this codebase (a vanilla
+  itself - confirmed wrong at least twice in this codebase (a base-game
   tile class assumed to work for list rows, a `ScrollController` type
   that broke the whole HUD the moment it was actually instantiated).
 
-### Vanilla component/CSS reuse
+### Base-game component/CSS reuse
 
 A handful of `UI/src/vanilla/*.ts` files each export one `getModule`
 result - one real consumer earns one export, not a wholesale resolver
 file:
 
-- **`TextInputTheme.ts`** - vanilla text-input look, applied to every
+- **`TextInputTheme.ts`** - base-game text-input look, applied to every
   plain `<input>` alongside this mod's own `textInputBasic` SCSS mixin.
-- **`EllipsisTextInput.ts`** - the real vanilla rename-field component
+- **`EllipsisTextInput.ts`** - the real base-game rename-field component
   (focus/select-on-open, Enter/blur-away commit all work correctly via
   a plain forwarded ref). Known, accepted limitation: its internal
   focus-driven "Back" hint consumes Escape as its own exit gesture,
@@ -345,10 +348,10 @@ file:
 
 ### Hand-styled chrome
 
-Not every piece of UI needs vanilla-verification first. Where vanilla
-gives *working behavior* worth not reimplementing (an input's focus
-handling, a tile's real DOM shape), verify against the real game CSS/JS
-before trusting it. Where it's pure visual styling with no hidden
+Not every piece of UI needs base-game-verification first. Where the
+base game gives *working behavior* worth not reimplementing (an input's
+focus handling, a tile's real DOM shape), verify against the real game
+CSS/JS before trusting it. Where it's pure visual styling with no hidden
 behavior at stake - button shape, dropdown chrome, card-style list rows
 - this codebase hand-styles and corrects via real in-game screenshots
 instead, the same way `cs2/ui`'s default pill-shaped `Button` was
@@ -364,13 +367,3 @@ player. `UIErrorState` (a small static holder shared by
 `CollectionUISystem`/`ZoneUISystem`) now captures the same message text
 already sent to the log and surfaces it as one dismissible banner above
 the shell's tab bar, via one binding/trigger pair.
-
-## Known gaps before a public release
-
-- The repo and local project directory are still named `CS2StyleMod`,
-  left over from before the mod was renamed to "Zone Builder" in every
-  player-facing and code-identifier surface.
-- The Level-1-to-spawn limitation (see "Known limitations" above) is a
-  real, reported pain point for collections built entirely from
-  higher-level assets - no fix implemented, see git history for the
-  options considered.
