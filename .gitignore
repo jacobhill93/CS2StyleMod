@@ -6,3 +6,12 @@ Logs/
 Library/
 *.suo
 UI/node_modules/
+
+# Local-only dev docs: detailed decision/debugging history, superseded by
+# ARCHITECTURE.md as the public-facing reference. Kept on disk for our
+# own future bug-fixing, not published.
+DECISIONS.md
+TOUCHPOINTS.md
+UI_OVERHAUL_PLAN.md
+UI_UPGRADE_GUIDE.md
+.research-roadbuilder/

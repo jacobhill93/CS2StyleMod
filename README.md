@@ -4,9 +4,8 @@ A Cities: Skylines II mod for controlling **which buildings grow where**.
 
 > Status: Custom Zones is implemented and confirmed working in-game -
 > Collections/Zones/Assets management UI, zone cloning, building
-> leveling, asset thumbnails. District Themes is shelved on a separate
-> unmerged branch (see [ARCHITECTURE.md](ARCHITECTURE.md)). See
-> [DECISIONS.md](DECISIONS.md) for the full history.
+> leveling, asset thumbnails. District Themes is shelved, an empty stub.
+> See [ARCHITECTURE.md](ARCHITECTURE.md) for how it's built.
 
 ## Features
 
@@ -71,4 +70,4 @@ dependency needed for them. One optional, recommended companion:
 This list is documentation only for now, not yet wired into `UI/mod.json`'s
 own `dependencies` field - its real schema (hard load-blocking requirement
 vs. a soft/recommended entry, and the exact entry format) hasn't been
-confirmed from a real working example yet. See DECISIONS.md.
+confirmed from a real working example yet.
