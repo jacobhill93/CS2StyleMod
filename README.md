@@ -71,3 +71,8 @@ This list is documentation only for now, not yet wired into `UI/mod.json`'s
 own `dependencies` field - its real schema (hard load-blocking requirement
 vs. a soft/recommended entry, and the exact entry format) hasn't been
 confirmed from a real working example yet.
+
+## License
+
+[MIT](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for
+code adapted from other MIT-licensed projects.
