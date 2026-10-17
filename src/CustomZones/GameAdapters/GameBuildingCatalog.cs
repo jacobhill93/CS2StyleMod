@@ -1,5 +1,6 @@
 ﻿using Colossal.Entities;
 using ZoneBuilder.Core;
+using ZoneBuilder.CustomZones;
 using Game.Buildings;
 using Game.Prefabs;
 using Game.Zones;
@@ -330,6 +331,19 @@ namespace ZoneBuilder.CustomZones.GameAdapters
             // zone" regardless. Filtering them out here is the correct
             // place: nothing should ever present them as a candidate.
             if (m_EntityManager.HasComponent<SignatureBuildingData>(buildingEntity))
+                return false;
+
+            // Our own clones (CustomZoneBuilder.EnsureBuildingCloned) are
+            // real SpawnableBuildingData-carrying buildings - nothing
+            // about them is structurally wrong, so they'd otherwise pass
+            // every check below and show up as an ordinary candidate.
+            // Excluded here rather than in the UI: a clone showing up as
+            // a separate, pickable "asset" right next to the original
+            // building it was cloned from is confusing clutter, not
+            // something any caller of this catalog ever wants to see -
+            // the one place this check belongs is where every other
+            // exclusion (Signature buildings, above) already lives.
+            if (prefab.name.StartsWith(CustomZoneBuilder.NamePrefix, StringComparison.Ordinal))
                 return false;
 
             var spawnable = m_EntityManager.GetComponentData<SpawnableBuildingData>(buildingEntity);

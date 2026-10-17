@@ -36,7 +36,13 @@ namespace ZoneBuilder.CustomZones
         // Prefix for every prefab this builder registers - keeps our
         // clones trivially distinguishable from vanilla/other-mod prefabs
         // by name alone, and namespaces the internal naming scheme below.
-        private const string NamePrefix = "ZoneBuilder.Zone.";
+        // internal, not private: GameBuildingCatalog.TryDescribeBuilding
+        // uses this same prefix to exclude our own cloned buildings from
+        // the Assets tab's browsable list - a building's own clone
+        // showing up as a pickable "asset" right next to the original it
+        // was cloned from is confusing, not a feature (user feedback,
+        // 2026-10-17).
+        internal const string NamePrefix = "ZoneBuilder.Zone.";
 
         private readonly PrefabSystem m_PrefabSystem;
         private readonly PrefabUISystem m_PrefabUISystem;
