@@ -7,11 +7,37 @@
 	<ShortDescription Value="Control which buildings grow where, via custom zones and district themes." />
 	<!--Long description of the mod. Single line or multi line. Supports minimal markdown subset-->
 	<LongDescription>
-One mod, two independently toggleable features built on a shared Collections core.
+# Zone builder gives you the freedom to design custom zones down to the individual asset.
 
-Custom Zones: create new zone types backed by a collection of buildings, painted with the normal zoning tools.
+Tired of having to constantly switch between different residential zone types while filling out your suburbs? Want to build a city that adheres to one type of asset theme? Zone Builder is your tool to help speed up the zoning process while allowing you to build and manage a whole variety of zone themes.
 
-District Themes: assign a theme (one or more collections) to a district so newly spawned buildings are drawn only from matching buildings.
+## How it works
+
+When using Zone Builder, you will navigate between three tabs, each covering one layer of zone hierarchy.
+
+The zone hierarchy goes assets -> collections -> zones
+
+### Assets tab
+
+The assets tab is a grid or row list of all assets in game. This covers vanilla, custom, DLC, etc., across residential, commercial, office, and industrial. When not editing a collection, these are view-only. Assets can be searched by name, or narrowed down across a multitude of filters (pack, level, width, length)
+
+### Collections tab
+
+A collection is an "asset basket". Create a collection (example: US Rust Belt), and click add assets - you will be navigated to the assets tab. From there, you can begin choosing which assets you'd like to add. Add as many as you like! Once you're done, you can finalize your collection. Collections are editable at any time.
+
+### Zones tab
+
+These are your zones - each zone you create here will spawn a real zone in the game's zone tab. You will need to classify if this zone is NA or EU, and the zone's base type (Residential Low/Med/High, Commercial Low/High, Office Low/High, Industrial). Once your zone is created, it is selectable and paintable in-game, just like any other zone. **But wait!** Zones need collections to spawn - make sure you edit your zone, assign it a collection, or multiple collections should you wish, and save. From there - paint away, and watch your chosen assets spawn!
+
+Known quirks and limitations:
+
+*   Zones you create will show up in platter as soon as you create them. Zones you delete will remain in platter until you restart the game.
+*   Lag on assigning collections to zones. With a large collection, you will notice a good lag when assign that collection to a zone. There will be UI showing load progress - however this lag is normal, as the game is cloning assets to be used in the new zone.
+*   Find It: assets in collections will show as duplicates in Find It, however with a naming convention that distinguishes it from the original asset. There is no away around this currently.
+
+### AI disclosure policy
+
+I strongly believe in being 100% upfront about when and how AI is used, and where used, how exactly it was used. This mod's code was written through agents. Each scoped feature was validated through unit testing as well as UAT (human UAT) in-game. This UAT included confirming an existing feature works, it did not break other features, and compatibility with other zone-related mods did not change. Human involvement was present at each and every step of the way, and all architectural decisions and feature tradeoffs were made by humans, but the code itself is AI-written. Artwork (there's basically no artwork) was human-made. Github repo is linked to this mod and public, for those who wish to check it out.
 	</LongDescription>
 	<!--Thumbnail-->
 	<Thumbnail Value="Properties/Thumbnail.png" />
@@ -22,7 +48,7 @@ District Themes: assign a theme (one or more collections) to a district so newly
 	<!--Link to the forum post where the mod can be discussed-->
 	<ForumLink Value="" />
 	<!--Version of the mod-->
-	<ModVersion Value="0.2" />
+	<ModVersion Value="0.3" />
 	<!--Recommended version of the base game to use the mod-->
 	<GameVersion Value="1.0.*" />
 	<!--Dependency for the mod, can be set multiple times-->
@@ -31,9 +57,11 @@ District Themes: assign a theme (one or more collections) to a district so newly
 	<RequiredDLC Value="" />
 	<!--Change log for new version. Single line or multi line. Supports minimal markdown subset-->
 	<ChangeLog>
-New mod badge/thumbnail.
+Fixed: a collection's own cloned buildings no longer show up as duplicate entries in the Assets tab picker.
 
-Toolbar icon: the Universal Mod Menu entry now shows a proper icon instead of plain text.
+Fixed: editing a collection's assets (adding/removing a building) while it's attached to a zone now actually rebuilds that zone, so the change spawns instead of silently doing nothing.
+
+Updated the mod's long description.
 	</ChangeLog>
 	<!--External link, can be set multiple times. supported types are "discord", "github", "youtube", "twitch", "x", "paypal", "patreon", "buymeacoffee", "kofi", "crowdin", "gitlab", "gofundme"-->
 	<ExternalLink Type="github" Url="https://github.com/jph093/ZoneBuilder" />
