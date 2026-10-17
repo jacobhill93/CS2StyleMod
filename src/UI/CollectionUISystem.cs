@@ -101,6 +101,7 @@ namespace ZoneBuilder.UI
             if (!TryDelete(guid))
                 return;
 
+            RebuildZonesReferencing(guid, m_BuildRequestSystem);
             RefreshCollections();
         }
 
@@ -135,6 +136,7 @@ namespace ZoneBuilder.UI
             if (!TrySave(collection, "add building to"))
                 return;
 
+            RebuildZonesReferencing(guid, m_BuildRequestSystem);
             RefreshCollections();
         }
 
@@ -149,6 +151,7 @@ namespace ZoneBuilder.UI
             if (!TrySave(collection, "remove building from"))
                 return;
 
+            RebuildZonesReferencing(guid, m_BuildRequestSystem);
             RefreshCollections();
         }
 
@@ -204,6 +207,26 @@ namespace ZoneBuilder.UI
         private void RefreshCollections()
         {
             m_Collections.Value = GetEntries();
+        }
+
+        // The actual bug behind "I added a building to a collection and
+        // nothing happened - it never spawned" (user feedback,
+        // 2026-10-17): every mutation here only ever saved the Collection
+        // itself and refreshed this system's own Collections binding -
+        // nothing told any zone already using this collection to
+        // rebuild. ZoneUISystem's own attach/detach handlers always
+        // follow a save with exactly this request; a collection's
+        // membership changing needs the same treatment for every zone
+        // that references it, not just the zone-side attach/detach
+        // mutations. Harmless no-op when no zone currently references
+        // this collection (the loop below just finds nothing to request).
+        private static void RebuildZonesReferencing(Guid collectionId, CustomZones.CustomZoneBuildRequestSystem buildRequestSystem)
+        {
+            foreach (var definition in Mod.CustomZoneDefinitionLibrary.GetAll())
+            {
+                if (definition.CollectionIds.Contains(collectionId))
+                    buildRequestSystem.Request(definition, ZoneUISystem.ResolveCollections(definition));
+            }
         }
 
         // Centralizes the try/catch every mutation above needs -

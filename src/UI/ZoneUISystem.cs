@@ -230,7 +230,11 @@ namespace ZoneBuilder.UI
             }
         }
 
-        private static IEnumerable<Collection> ResolveCollections(CustomZoneDefinition definition)
+        // internal, not private: CollectionUISystem reuses this exact
+        // resolution when a Collection's own membership changes (add/
+        // remove/delete) and every zone attached to it needs to rebuild
+        // too - see that system's RebuildZonesReferencing.
+        internal static IEnumerable<Collection> ResolveCollections(CustomZoneDefinition definition)
         {
             foreach (var collectionId in definition.CollectionIds)
             {
